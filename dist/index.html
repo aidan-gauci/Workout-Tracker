@@ -20,5 +20,318 @@
 
     <title>Aidan's Workout Tracker</title>
   </head>
-  <body></body>
+  <body class="bg-bg text-text font-sans min-h-screen px-5 pt-10 pb-20">
+    <header class="w-full text-center relative mx-auto">
+      <span class="inline-block text-xs font-bold tracking-normal uppercase text-accent border border-accent px-3.5 py-1 mb-4"> Workout Tracker </span>
+      <h1 class="font-bebas text-[clamp(52px,10vw,110px)] leading-none tracking-tight text-text">6-DAY<br /><span class="text-accent">TRAINING</span><br />SPLIT</h1>
+      <div class="mt-4 text-muted text-[clamp(0.75rem,1.2vw,1rem)] font-light tracking-wide">LAT-WIDTH PRIORITY · TRICEP PRIORITY · FOREARM COVERAGE</div>
+      <div class="w-16 h-0.5 bg-accent mx-auto my-5"></div>
+    </header>
+
+    <main>
+      <section class="max-w-275 mx-auto bg-surface border border-border px-5 py-3 mb-5">
+        <p class="inline-block border-b border-border text-xl font-bold tracking-widest text-accent-2 uppercase pb-2 mb-2">Muscle Gap Analysis</p>
+        <ul class="list-none">
+          <li>
+            <strong class="block text-sm font-semibold text-text mb-0.5">Upper Chest</strong>
+            <p class="text-xs text-muted leading-relaxed">Lacking volume compared to lower chest.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="max-w-275 mx-auto grid grid-cols-1 min-[780px]:grid-cols-2 min-[1140px]:grid-cols-3 gap-5">
+        <article class="bg-surface border border-border">
+          <div class="border-b border-border flex items-start gap-3 p-5">
+            <p class="font-bebas text-5xl leading-none text-border">01</p>
+            <div class="flex flex-col">
+              <h2 class="font-bebas text-3xl leading-tight tracking-normal">CHEST & BICEPS</h2>
+              <div class="text-black text-xs font-bold flex flex-wrap gap-1.5 tracking-wider py-0.75">
+                <span class="bg-chest rounded-md px-2 py-0.75">CHEST</span>
+                <span class="bg-biceps rounded-md px-2 py-0.75">BICEPS</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3 px-5 py-2">
+            <ul class="list-none">
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-chest leading-tight">Barbell Bench Press</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 6-8</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-biceps leading-tight">Dumbbell Hammer Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 8-10</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-chest leading-tight">Incline Dumbbell Press</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 6-8</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-biceps leading-tight">Dumbbell Preacher Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 8-10</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-chest leading-tight">Smith Incline Press</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">2 x 8-10</p>
+              </li>
+              <li class="border-b border-border last:border-b-0 flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-biceps leading-tight">Incline Dumbbell Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">2 x 8-10</p>
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="bg-surface border border-border">
+          <div class="border-b border-border flex items-start gap-3 p-5">
+            <p class="font-bebas text-5xl leading-none text-border">02</p>
+            <div class="flex flex-col">
+              <h2 class="font-bebas text-3xl leading-tight tracking-normal">BACK & TRICEPS</h2>
+              <div class="text-black text-xs font-bold flex flex-wrap gap-1.5 tracking-wider py-0.75">
+                <span class="bg-back rounded-md px-2 py-0.75">BACK</span>
+                <span class="bg-triceps rounded-md px-2 py-0.75">TRICEPS</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3 px-5 py-2">
+            <ul class="list-none">
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-back leading-tight">Close Neutral Grip Lat Pulldown</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 8-10</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-triceps leading-tight">Dips</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 8-10</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-back leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Straight-Arm Pulldowns</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-triceps leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Tricep Pushdown</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-back leading-tight">Chest-Supported Row</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 10-12</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-triceps leading-tight">Overhead Tricep Extension</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border last:border-b-0 flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-back leading-tight">Barbell Shrugs</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-shoulders leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Dumbbell Lateral Raises</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 8-10</p>
+              </li>
+              <li class="border-b border-border last:border-b-0 flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-forearms leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Reverse Wrist Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="bg-surface border border-border">
+          <div class="border-b border-border flex items-start gap-3 p-5">
+            <p class="font-bebas text-5xl leading-none text-border">03</p>
+            <div class="flex flex-col">
+              <h2 class="font-bebas text-3xl leading-tight tracking-normal">LEGS & ABS</h2>
+              <div class="text-black text-xs font-bold flex flex-wrap gap-1.5 tracking-wider py-0.75">
+                <span class="bg-legs rounded-md px-2 py-0.75">LEGS</span>
+                <span class="bg-abs rounded-md px-2 py-0.75">ABS</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3 px-5 py-2">
+            <ul class="list-none">
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Barbell Back Squat</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 6-10</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Seated Cable Deadlift</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 10-12</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-abs leading-tight">In-Air Crunches</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 15-20</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Leg Extension</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Seated Calf Raise</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 15-20</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Lying Leg Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border last:border-b-0 flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-abs leading-tight">Oblique Crunches</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="bg-surface border border-border">
+          <div class="border-b border-border flex items-start gap-3 p-5">
+            <p class="font-bebas text-5xl leading-none text-border">04</p>
+            <div class="flex flex-col">
+              <h2 class="font-bebas text-3xl leading-tight tracking-normal">SHOULDERS & ARMS</h2>
+              <div class="text-black text-xs font-bold flex flex-wrap gap-1.5 tracking-wider py-0.75">
+                <span class="bg-shoulders rounded-md px-2 py-0.75">SHOULDERS</span>
+                <span class="bg-biceps rounded-md px-2 py-0.75">BICEPS</span>
+                <span class="bg-triceps rounded-md px-2 py-0.75">TRICEPS</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3 px-5 py-2">
+            <ul class="list-none">
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-shoulders leading-tight">Shoulder Press</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 8-10</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-triceps leading-tight">Dips</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 6-8</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-biceps leading-tight">Dumbbell Preacher Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-shoulders leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Face Pulls</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 15-20</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-triceps leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Tricep Pushdown</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-biceps leading-tight">Dumbbell Hammer Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-triceps leading-tight">Overhead Tricep Extension</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 10-12</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-shoulders leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Dumbbell Lateral Raises</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 8-10</p>
+              </li>
+              <li class="border-b border-border last:border-b-0 flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-forearms leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Wrist Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="bg-surface border border-border">
+          <div class="border-b border-border flex items-start gap-3 p-5">
+            <p class="font-bebas text-5xl leading-none text-border">05</p>
+            <div class="flex flex-col">
+              <h2 class="font-bebas text-3xl leading-tight tracking-normal">CHEST & BACK</h2>
+              <div class="text-black text-xs font-bold flex flex-wrap gap-1.5 tracking-wider py-0.75">
+                <span class="bg-chest rounded-md px-2 py-0.75">CHEST</span>
+                <span class="bg-back rounded-md px-2 py-0.75">BACK</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3 px-5 py-2">
+            <ul class="list-none">
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-back leading-tight">Close Neutral Lat Pulldown</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 10-12</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-chest leading-tight">Barbell Bench Press</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 15-20</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-back leading-tight">Straight-Arm Pulldowns</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-chest leading-tight">Incline Dumbbell Press</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 10-12</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-back leading-tight">Chest-Supported Row</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-chest leading-tight">Smith Incline Press</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 15-20</p>
+              </li>
+              <li class="border-b border-border last:border-b-0 flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-back leading-tight">Barbell Shrugs</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="bg-surface border border-border">
+          <div class="border-b border-border flex items-start gap-3 p-5">
+            <p class="font-bebas text-5xl leading-none text-border">06</p>
+            <div class="flex flex-col">
+              <h2 class="font-bebas text-3xl leading-tight tracking-normal">LEGS & ABS</h2>
+              <div class="text-black text-xs font-bold flex flex-wrap gap-1.5 tracking-wider py-0.75">
+                <span class="bg-legs rounded-md px-2 py-0.75">LEGS</span>
+                <span class="bg-abs rounded-md px-2 py-0.75">ABS</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3 px-5 py-2">
+            <ul class="list-none">
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Leg Press</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 6-10</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Seated Cable Deadlift</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 10-12</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-abs leading-tight">In-Air Crunches</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 15-20</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Seated Calf Raise</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">4 x 15-20</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Lying Leg Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-legs leading-tight">Leg Extension</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-abs leading-tight">Oblique Crunches</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+              <li class="border-b border-border flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-shoulders leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Dumbbell Lateral Raises</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 8-10</p>
+              </li>
+              <li class="border-b border-border last:border-b-0 flex flex-row justify-between gap-3 items-center py-2">
+                <p class="text-s font-medium text-forearms leading-tight"><span class="bg-orange-600 text-sm rounded-lg text-text px-1 py-0.5 mr-2">SS</span>Reverse Wrist Curl</p>
+                <p class="text-sm text-accent whitespace-nowrap shrink-0">3 x 12-15</p>
+              </li>
+            </ul>
+          </div>
+        </article>
+      </section>
+    </main>
+    <footer></footer>
+  </body>
 </html>
