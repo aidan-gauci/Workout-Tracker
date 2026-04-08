@@ -155,7 +155,8 @@ function renderWorkoutForm(workout) {
             const button = e.target;
             button.disabled = true;
             button.innerText = 'Saving...';
-            const currentSessionId = Date.now();
+            const datePrefix = new Date().toISOString().split('T')[0];
+            const currentSessionId = `${datePrefix}-${Date.now()}`;
             const newSession = {
                 session_id: currentSessionId,
                 workout_id: workout.workout_id,
@@ -182,7 +183,7 @@ function renderWorkoutForm(workout) {
             });
             exerciseGroups.forEach((sets, exerciseId) => {
                 const newInstance = {
-                    instance_id: currentSessionId + instanceIdCounter++,
+                    instance_id: `${currentSessionId}-${instanceIdCounter++}`,
                     session_id: currentSessionId,
                     exercise_id: exerciseId,
                     sets: sets,

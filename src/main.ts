@@ -18,14 +18,14 @@ type Workout = {
 };
 
 type WorkoutInstance = {
-  session_id: number;
+  session_id: string;
   workout_id: number;
   date: string;
 };
 
 type ExerciseInstance = {
-  instance_id: number;
-  session_id: number;
+  instance_id: string;
+  session_id: string;
   exercise_id: number;
   sets: {
     num: number;
@@ -38,7 +38,10 @@ let exerciseDB: Exercise[] = [];
 let workoutDB: Workout[] = [];
 let globalExerciseIdCounter = 1;
 
-function initializeSchemaFromDOM() {
+function initialiseSchemaFromDOM() {
+  workoutDB = [];
+  let hasNewExercises = false;
+
   const articles = document.querySelectorAll('article');
 
   articles.forEach((article, index) => {
@@ -63,6 +66,7 @@ function initializeSchemaFromDOM() {
       const [setNumber, repRange] = exerciseRangeElement.innerText.split(' x ') as [string, string];
 
       let exerciseObj = exerciseDB.find((e) => e.name === exerciseName);
+
       if (!exerciseObj) {
         exerciseObj = {
           exercise_id: globalExerciseIdCounter++,
@@ -72,6 +76,11 @@ function initializeSchemaFromDOM() {
           rep_range: repRange,
         };
         exerciseDB.push(exerciseObj);
+        hasNewExercises = true;
+      } else {
+        exerciseObj.muscle = muscleGroup;
+        exerciseObj.set_num = parseInt(setNumber);
+        exerciseObj.rep_range = repRange;
       }
 
       exercisesForThisWorkout.push(exerciseObj);
@@ -84,16 +93,19 @@ function initializeSchemaFromDOM() {
     });
   });
 
-  console.log('Schema Successfully Hydrated from DOM!');
-  console.log('All Exercises:', exerciseDB);
-  console.log('All Workouts:', workoutDB);
+  if (hasNewExercises) {
+    saveWorkoutData().catch((e) => console.error('Background dictionary save failed', e));
+  }
+
+  console.log('Schema Successfully Hydrated! Master Dictionary Length:', exerciseDB.length);
 }
 
 // INITIALIZATION & EVENT LISTENERS
 
-window.addEventListener('DOMContentLoaded', () => {
-  initializeSchemaFromDOM();
-  loadWorkoutData();
+window.addEventListener('DOMContentLoaded', async () => {
+  await loadWorkoutData();
+
+  initialiseSchemaFromDOM();
 
   const gymDaysDropdown = document.getElementById('gym-days') as HTMLSelectElement;
   const workoutLogContainer = document.getElementById('workout-log-container') as HTMLDivElement;
@@ -215,7 +227,8 @@ function renderWorkoutForm(workout: Workout) {
       button.disabled = true;
       button.innerText = 'Saving...';
 
-      const currentSessionId = Date.now();
+      const datePrefix = new Date().toISOString().split('T')[0];
+      const currentSessionId = `${datePrefix}-${Date.now()}`;
 
       const newSession: WorkoutInstance = {
         session_id: currentSessionId,
@@ -249,7 +262,7 @@ function renderWorkoutForm(workout: Workout) {
 
       exerciseGroups.forEach((sets, exerciseId) => {
         const newInstance: ExerciseInstance = {
-          instance_id: currentSessionId + instanceIdCounter++,
+          instance_id: `${currentSessionId}-${instanceIdCounter++}`,
           session_id: currentSessionId,
           exercise_id: exerciseId,
           sets: sets,
@@ -296,11 +309,22 @@ async function loadWorkoutData() {
     mySessions = data.sessions || [];
     myExerciseInstances = data.instances || [];
 
+    exerciseDB = data.exercises || [];
+
+    if (exerciseDB.length > 0) {
+      const maxId = Math.max(...exerciseDB.map((e) => e.exercise_id));
+      globalExerciseIdCounter = maxId + 1;
+    } else {
+      globalExerciseIdCounter = 1;
+    }
+
     console.log('Local load complete. Current sessions:', mySessions.length);
   } catch (err) {
     console.log('No existing save file found. Starting with an empty log.');
     mySessions = [];
     myExerciseInstances = [];
+    exerciseDB = [];
+    globalExerciseIdCounter = 1;
   }
 }
 
@@ -308,6 +332,7 @@ async function saveWorkoutData() {
   const dataToSave = {
     sessions: mySessions,
     instances: myExerciseInstances,
+    exercises: exerciseDB,
   };
 
   try {
@@ -319,7 +344,6 @@ async function saveWorkoutData() {
     });
 
     console.log('Workout securely saved to local device!');
-    alert('Workout saved successfully!');
   } catch (err: any) {
     console.error('Error writing file:', err);
     alert(`Failed to save to device: ${err.message}`);
