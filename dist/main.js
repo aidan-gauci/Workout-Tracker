@@ -29,18 +29,14 @@ function initializeSchemaFromDOM() {
             if (muscleClass) {
                 muscleGroup = muscleClass.replace('text-', '');
             }
-            const clone = nameElement.cloneNode(true);
-            const ssBadge = clone.querySelector('span');
-            if (ssBadge)
-                ssBadge.remove();
-            const rawExerciseName = clone.innerText.trim();
+            const exerciseName = nameElement.innerText.replace('SS', '').trim();
             const exerciseRangeElement = li.querySelector('.exercise-range');
             const [setNumber, repRange] = exerciseRangeElement.innerText.split(' x ');
-            let exerciseObj = exerciseDB.find((e) => e.name === rawExerciseName);
+            let exerciseObj = exerciseDB.find((e) => e.name === exerciseName);
             if (!exerciseObj) {
                 exerciseObj = {
                     exercise_id: globalExerciseIdCounter++,
-                    name: rawExerciseName,
+                    name: exerciseName,
                     muscle: muscleGroup,
                     set_num: parseInt(setNumber),
                     rep_range: repRange,
@@ -97,7 +93,7 @@ function renderWorkoutForm(workout) {
         row.dataset.exerciseId = exercise.exercise_id.toString();
         row.innerHTML = `
       <p class="max-[550px]:text-xs max-[440px]:text-[10px] font-medium ${'text-' + exercise.muscle} pr-2">${exercise.name}</p>
-      <button class="option-dropdown w-fit flex justify-center align-middle p-1 max-[440px]:p-0.5 m-2 max:[440px]:m-0 border border-border rounded-full text-border cursor-pointer rotate-0 transition-transform duration-300">
+      <button class="option-dropdown w-fit flex justify-center align-middle p-1 max-[440px]:p-0.5 m-2 max:[440px]:m-0 border border-border rounded-full text-border cursor-pointer rotate-0">
         <svg class="fill-current size-5 max-[550px]:size-4 max-[440px]:size-3" viewBox="0 0 20 20">
           <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
         </svg>
@@ -116,8 +112,8 @@ function renderWorkoutForm(workout) {
         const totalSets = exercise.set_num ? exercise.set_num : 3;
         for (let i = 1; i <= totalSets; i++) {
             setsHTML += `
-        <div class="grid gap-3 items-center" style="grid-template-columns: 1fr 12.5% 12.5%">
-          <p class="max-[440px]:text-[10px]">Set ${i}:</p>
+        <div class="grid gap-2 items-center" style="grid-template-columns: 1fr 12.5% 12.5%" data-set-num="${i}">
+          <p class="exercise-set max-[440px]:text-[10px]">Set ${i}:</p>
           <input 
             type="number" 
             class="exercise-reps w-full bg-transparent border border-border text-white rounded-lg text-center py-2.5 max-[550px]:py-1.5 max-[440px]:py-1 max-[440px]:text-[10px] focus:ring-accent focus:border-accent appearance-none m-0 min-w-0" 
@@ -155,9 +151,56 @@ function renderWorkoutForm(workout) {
     workoutLogContainer.appendChild(saveButtonRow);
     const saveBtn = document.getElementById('save-workout-btn');
     if (saveBtn) {
-        saveBtn.addEventListener('click', () => {
-            console.log(`Saving ${workout.name}...`);
-        });
+        saveBtn.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+            const button = e.target;
+            button.disabled = true;
+            button.innerText = 'Saving...';
+            const currentSessionId = Date.now();
+            const newSession = {
+                session_id: currentSessionId,
+                workout_id: workout.workout_id,
+                date: new Date().toISOString(),
+            };
+            const exerciseRows = document.querySelectorAll('.workout-log-entry');
+            let instanceIdCounter = 1;
+            const exerciseGroups = new Map();
+            exerciseRows.forEach((exerciseRow) => {
+                const exerciseId = parseInt(exerciseRow.getAttribute('data-exercise-id') || '0', 10);
+                const setRows = exerciseRow.querySelectorAll('[data-set-num]');
+                setRows.forEach((setRow) => {
+                    var _a, _b, _c;
+                    const setNum = parseInt(setRow.getAttribute('data-set-num') || '1', 10);
+                    const reps = parseInt((_a = setRow.querySelector('.exercise-reps')) === null || _a === void 0 ? void 0 : _a.value, 10) || 0;
+                    const weight = parseFloat((_b = setRow.querySelector('.exercise-weight')) === null || _b === void 0 ? void 0 : _b.value) || 0;
+                    if (reps > 0) {
+                        if (!exerciseGroups.has(exerciseId)) {
+                            exerciseGroups.set(exerciseId, []);
+                        }
+                        (_c = exerciseGroups.get(exerciseId)) === null || _c === void 0 ? void 0 : _c.push({ num: setNum, reps, weight });
+                    }
+                });
+            });
+            exerciseGroups.forEach((sets, exerciseId) => {
+                const newInstance = {
+                    instance_id: currentSessionId + instanceIdCounter++,
+                    session_id: currentSessionId,
+                    exercise_id: exerciseId,
+                    sets: sets,
+                };
+                myExerciseInstances.push(newInstance);
+            });
+            mySessions.push(newSession);
+            yield saveWorkoutData();
+            button.innerText = 'Saved!';
+            button.classList.replace('text-accent', 'text-green-500');
+            button.classList.replace('border-accent', 'border-green-500');
+            setTimeout(() => {
+                button.disabled = false;
+                button.innerText = 'Save Workout';
+                button.classList.replace('text-green-500', 'text-accent');
+                button.classList.replace('border-green-500', 'border-accent');
+            }, 2000);
+        }));
     }
 }
 let mySessions = [];

@@ -58,19 +58,15 @@ function initializeSchemaFromDOM() {
         muscleGroup = muscleClass.replace('text-', '') as Exercise['muscle'];
       }
 
-      const clone = nameElement.cloneNode(true) as HTMLElement;
-      const ssBadge = clone.querySelector('span');
-      if (ssBadge) ssBadge.remove();
-      const rawExerciseName = clone.innerText.trim();
-
+      const exerciseName = nameElement.innerText.replace('SS', '').trim();
       const exerciseRangeElement = li.querySelector('.exercise-range') as HTMLElement;
       const [setNumber, repRange] = exerciseRangeElement.innerText.split(' x ') as [string, string];
 
-      let exerciseObj = exerciseDB.find((e) => e.name === rawExerciseName);
+      let exerciseObj = exerciseDB.find((e) => e.name === exerciseName);
       if (!exerciseObj) {
         exerciseObj = {
           exercise_id: globalExerciseIdCounter++,
-          name: rawExerciseName,
+          name: exerciseName,
           muscle: muscleGroup,
           set_num: parseInt(setNumber),
           rep_range: repRange,
@@ -165,8 +161,8 @@ function renderWorkoutForm(workout: Workout) {
 
     for (let i = 1; i <= totalSets; i++) {
       setsHTML += `
-        <div class="grid gap-3 items-center" style="grid-template-columns: 1fr 12.5% 12.5%">
-          <p class="max-[440px]:text-[10px]">Set ${i}:</p>
+        <div class="grid gap-2 items-center" style="grid-template-columns: 1fr 12.5% 12.5%" data-set-num="${i}">
+          <p class="exercise-set max-[440px]:text-[10px]">Set ${i}:</p>
           <input 
             type="number" 
             class="exercise-reps w-full bg-transparent border border-border text-white rounded-lg text-center py-2.5 max-[550px]:py-1.5 max-[440px]:py-1 max-[440px]:text-[10px] focus:ring-accent focus:border-accent appearance-none m-0 min-w-0" 
@@ -212,9 +208,70 @@ function renderWorkoutForm(workout: Workout) {
   workoutLogContainer.appendChild(saveButtonRow);
 
   const saveBtn = document.getElementById('save-workout-btn');
+
   if (saveBtn) {
-    saveBtn.addEventListener('click', () => {
-      console.log(`Saving ${workout.name}...`);
+    saveBtn.addEventListener('click', async (e) => {
+      const button = e.target as HTMLButtonElement;
+      button.disabled = true;
+      button.innerText = 'Saving...';
+
+      const currentSessionId = Date.now();
+
+      const newSession: WorkoutInstance = {
+        session_id: currentSessionId,
+        workout_id: workout.workout_id,
+        date: new Date().toISOString(),
+      };
+
+      const exerciseRows = document.querySelectorAll('.workout-log-entry');
+      let instanceIdCounter = 1;
+
+      const exerciseGroups = new Map<number, { num: number; reps: number; weight: number }[]>();
+
+      exerciseRows.forEach((exerciseRow) => {
+        const exerciseId = parseInt(exerciseRow.getAttribute('data-exercise-id') || '0', 10);
+
+        const setRows = exerciseRow.querySelectorAll('[data-set-num]');
+
+        setRows.forEach((setRow) => {
+          const setNum = parseInt(setRow.getAttribute('data-set-num') || '1', 10);
+          const reps = parseInt((setRow.querySelector('.exercise-reps') as HTMLInputElement)?.value, 10) || 0;
+          const weight = parseFloat((setRow.querySelector('.exercise-weight') as HTMLInputElement)?.value) || 0;
+
+          if (reps > 0) {
+            if (!exerciseGroups.has(exerciseId)) {
+              exerciseGroups.set(exerciseId, []);
+            }
+            exerciseGroups.get(exerciseId)?.push({ num: setNum, reps, weight });
+          }
+        });
+      });
+
+      exerciseGroups.forEach((sets, exerciseId) => {
+        const newInstance: ExerciseInstance = {
+          instance_id: currentSessionId + instanceIdCounter++,
+          session_id: currentSessionId,
+          exercise_id: exerciseId,
+          sets: sets,
+        };
+        myExerciseInstances.push(newInstance);
+      });
+
+      mySessions.push(newSession);
+
+      await saveWorkoutData();
+
+      button.innerText = 'Saved!';
+      button.classList.replace('text-accent', 'text-green-500');
+      button.classList.replace('border-accent', 'border-green-500');
+
+      setTimeout(() => {
+        button.disabled = false;
+        button.innerText = 'Save Workout';
+
+        button.classList.replace('text-green-500', 'text-accent');
+        button.classList.replace('border-green-500', 'border-accent');
+      }, 2000);
     });
   }
 }
