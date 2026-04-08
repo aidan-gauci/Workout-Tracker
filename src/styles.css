@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @source '../dist/index.html';
+@source '../src/**/*.ts';
 
 @theme {
   --font-bebas: 'Bebas Neue', sans-serif;
