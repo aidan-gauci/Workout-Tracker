@@ -150,8 +150,15 @@ function renderWorkoutForm(workout: Workout) {
     row.dataset.exerciseId = exercise.exercise_id.toString();
 
     row.innerHTML = `
-      <p class="max-[550px]:text-xs max-[440px]:text-[10px] font-medium ${'text-' + exercise.muscle} pr-2">${exercise.name}</p>
-      <button class="option-dropdown w-fit flex justify-center align-middle p-1 max-[440px]:p-0.5 m-2 max:[440px]:m-0 border border-border rounded-full text-border cursor-pointer rotate-0">
+      <div class="flex flex-row gap-4 ml-2 max-[440px]:gap-2 max-[440px]:ml-1 items-center">
+        <button class="exercise-delete w-fit relative transition-colors duration-200 ease-in-out flex justify-center align-middle p-1 max-[440px]:p-0.5 border border-border rounded-full text-border cursor-pointer">
+          <svg class="fill-current size-4 max-[440px]:size-3" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
+          </svg>
+        </button>
+        <p class="max-[550px]:text-sm max-[440px]:text-xs font-medium ${'text-' + exercise.muscle} pr-2">${exercise.name}</p>
+      </div>
+      <button class="option-dropdown w-fit flex justify-center align-middle p-1 max-[440px]:p-0.5 mx-auto max:[440px]:m-0 border border-border rounded-full text-border cursor-pointer rotate-0">
         <svg class="fill-current size-5 max-[550px]:size-4 max-[440px]:size-3" viewBox="0 0 20 20">
           <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
         </svg>
@@ -173,8 +180,20 @@ function renderWorkoutForm(workout: Workout) {
 
     for (let i = 1; i <= totalSets; i++) {
       setsHTML += `
-        <div class="grid gap-2 items-center" style="grid-template-columns: 1fr 12.5% 12.5%" data-set-num="${i}">
+        <div class="grid gap-3 items-center" style="grid-template-columns: 1fr 7.5% 12.5% 12.5%" data-set-num="${i}">
           <p class="exercise-set max-[440px]:text-[10px]">Set ${i}:</p>
+          <div class="w-fit flex flex-row gap-2 justify-center rounded-full mx-auto px-2 max-[440px]:px-1">
+            <button class="add-set w-fit relative flex justify-center align-middle mx-auto p-1 max-[440px]:p-0.5 border border-border rounded-full text-border cursor-pointer">
+              <svg class="fill-current size-4 max-[440px]:size-3" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 4a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 0110 4z" clip-rule="evenodd" />
+              </svg>
+            </button>
+            <button class="del-set w-fit relative flex justify-center align-middle p-1 max-[440px]:p-0.5 border border-border rounded-full text-border cursor-pointer">
+              <svg class="fill-current size-4 max-[440px]:size-3" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M4 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H4.75A.75.75 0 014 10z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </div>
           <input 
             type="number" 
             class="exercise-reps w-full bg-transparent border border-border text-white rounded-lg text-center py-2.5 max-[550px]:py-1.5 max-[440px]:py-1 max-[440px]:text-[10px] focus:ring-accent focus:border-accent appearance-none m-0 min-w-0" 
@@ -197,13 +216,50 @@ function renderWorkoutForm(workout: Workout) {
     row.appendChild(dropdownContainer);
 
     const dropdownBtn = row.querySelector('.option-dropdown') as HTMLButtonElement;
-    const icon = dropdownBtn.querySelector('svg') as SVGSVGElement;
+    const dropdownIcon = dropdownBtn.querySelector('svg') as SVGSVGElement;
 
     dropdownBtn.addEventListener('click', () => {
-      icon.classList.toggle('rotate-180');
-      icon.classList.toggle('rotate-0');
+      dropdownIcon.classList.toggle('rotate-180');
+      dropdownIcon.classList.toggle('rotate-0');
 
       dropdownContainer.classList.toggle('hidden');
+    });
+
+    const deleteBtn = row.querySelector('.exercise-delete') as HTMLButtonElement;
+    const deletePopup = document.createElement('span');
+    deletePopup.classList =
+      'w-fit absolute top-full mt-2 px-2 py-1 opacity-0 transition-opacity duration-200 ease-in-out bg-red-700 text-[10px] text-white border border-white rounded-full whitespace-nowrap';
+    deletePopup.innerText = 'Need 1 Exercise!';
+    let warningFlag: boolean = false;
+
+    deleteBtn.addEventListener('click', () => {
+      if (document.querySelectorAll('.workout-log-entry').length > 1) {
+        row.remove();
+      } else {
+        if (warningFlag) return;
+
+        warningFlag = true;
+
+        deleteBtn.classList.remove('border-border', 'text-border');
+        deleteBtn.classList.add('border-white', 'text-white', 'bg-red-700');
+        deleteBtn.appendChild(deletePopup);
+
+        setTimeout(() => {
+          deletePopup.classList.remove('opacity-0');
+          deletePopup.classList.add('opacity-100');
+        }, 10);
+
+        setTimeout(() => {
+          deleteBtn.classList.remove('border-white', 'text-white', 'bg-red-700');
+          deleteBtn.classList.add('border-border', 'text-border');
+          deletePopup.classList.remove('opacity-100');
+          deletePopup.classList.add('opacity-0');
+          setTimeout(() => {
+            deleteBtn.removeChild(deletePopup);
+            warningFlag = false;
+          }, 200);
+        }, 2000);
+      }
     });
 
     workoutLogContainer.appendChild(row);
