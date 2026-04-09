@@ -123,6 +123,7 @@ function initialiseSchemaFromDOM() {
 window.addEventListener('DOMContentLoaded', async () => {
   await loadWorkoutData();
   initialiseSchemaFromDOM();
+  catchExerciseData();
   setupGlobalEventListeners();
 });
 
@@ -520,6 +521,129 @@ function renderWorkoutForm(workout: Workout) {
   setupActionButtons(workout.workout_id, workoutLogContainer);
 }
 
+// WORKOUT ANALYSIS
+
+interface PerformanceEntry extends ExerciseInstance {
+  date: number;
+}
+
+type PerformanceDictionary = Record<number, PerformanceEntry[]>;
+
+function getPastPerformance(exerciseId: number): PerformanceEntry[] {
+  const instances = myExerciseInstances.filter((inst) => inst.exercise_id === exerciseId);
+
+  const instancesWithDates = instances.map((inst) => {
+    const session = mySessions.find((s) => s.session_id === inst.session_id);
+    return {
+      ...inst,
+      date: session ? new Date(session.date).getTime() : 0,
+    };
+  });
+
+  instancesWithDates.sort((a, b) => b.date - a.date);
+
+  let result = instancesWithDates.slice(0, 2);
+
+  if (result.length === 0) {
+    result.push({
+      instance_id: 'placeholder',
+      session_id: 'none',
+      exercise_id: exerciseId,
+      date: 0,
+      sets: [{ num: 1, reps: 0, weight: 0 }],
+    } as PerformanceEntry);
+  }
+
+  return result;
+}
+
+let fullExercisePerformance: PerformanceDictionary = {};
+
+function catchExerciseData() {
+  fullExercisePerformance = {};
+
+  for (let i = 1; i < globalExerciseIdCounter; i++) {
+    fullExercisePerformance[i] = getPastPerformance(i);
+  }
+}
+
+function getRepRange(exerciseId: number) {
+  for (const workout of workoutDB) {
+    const exerciseMatch = workout.exercises.find((ex) => ex.exercise_id === exerciseId);
+
+    if (exerciseMatch) {
+      return [exerciseMatch.reps.min_reps, exerciseMatch.reps.max_reps];
+    }
+  }
+
+  return null;
+}
+
+type AnalysisReport = {
+  exercise_id: number;
+  status: 'good' | 'bad';
+  report_code: -1 | 0 | 1;
+};
+
+function computePerformance(entry: PerformanceEntry): [number, number] {
+  let totalScore = 0;
+  let totalReps = 0;
+
+  entry.sets.forEach((set) => {
+    if (set.weight > 0) {
+      totalScore += set.weight * (1 + set.reps / 30);
+      totalReps += set.reps;
+    } else {
+      totalScore += set.reps;
+      totalReps += set.reps;
+    }
+  });
+
+  const averageScore = Math.round((totalScore * 10) / entry.sets.length) / 10;
+  const averageReps = Math.round((totalReps * 10) / entry.sets.length) / 10;
+  return [averageScore, averageReps];
+}
+
+function analysePerformance(exerciseId: number): AnalysisReport {
+  if (Object.keys(fullExercisePerformance).length === 0) catchExerciseData();
+
+  let performance = fullExercisePerformance[exerciseId];
+
+  if (!performance || performance.length < 2 || performance[0]?.session_id === 'none') {
+    throw new Error('Not enough data for this exercise.');
+  }
+
+  console.log(performance);
+
+  let statusCode: 'good' | 'bad' = 'bad';
+  let reportCode: -1 | 0 | 1 = 0;
+
+  let newPerformance = computePerformance(performance[0] as PerformanceEntry);
+  let oldPerformance = computePerformance(performance[1] as PerformanceEntry);
+
+  if (newPerformance[0] > oldPerformance[0]) statusCode = 'good';
+  else statusCode = 'bad';
+
+  const repRange = getRepRange(exerciseId);
+
+  let min: number = 0,
+    max: number = 0;
+
+  if (repRange) {
+    [min, max] = repRange as [number, number];
+  } else throw new Error('Invalid Exercise ID.');
+
+  if (newPerformance[1] < min) reportCode = -1;
+  else if (newPerformance[1] > max) reportCode = 1;
+  else reportCode = 0;
+
+  return {
+    exercise_id: exerciseId,
+    status: statusCode,
+    report_code: reportCode,
+  };
+}
+
 // DATA STORAGE
 
 let mySessions: WorkoutInstance[] = [];
@@ -627,7 +751,7 @@ export async function exportWorkoutData() {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
 
-    console.log('File successfully downloaded to your computer!');
+    console.log('File successfully downloaded to your computer.');
     return;
   }
 

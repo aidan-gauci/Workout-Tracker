@@ -72,6 +72,7 @@ function initialiseSchemaFromDOM() {
 window.addEventListener('DOMContentLoaded', () => __awaiter(void 0, void 0, void 0, function* () {
     yield loadWorkoutData();
     initialiseSchemaFromDOM();
+    catchExerciseData();
     setupGlobalEventListeners();
 }));
 function setupGlobalEventListeners() {
@@ -406,6 +407,94 @@ function renderWorkoutForm(workout) {
     });
     setupActionButtons(workout.workout_id, workoutLogContainer);
 }
+function getPastPerformance(exerciseId) {
+    const instances = myExerciseInstances.filter((inst) => inst.exercise_id === exerciseId);
+    const instancesWithDates = instances.map((inst) => {
+        const session = mySessions.find((s) => s.session_id === inst.session_id);
+        return Object.assign(Object.assign({}, inst), { date: session ? new Date(session.date).getTime() : 0 });
+    });
+    instancesWithDates.sort((a, b) => b.date - a.date);
+    let result = instancesWithDates.slice(0, 2);
+    if (result.length === 0) {
+        result.push({
+            instance_id: 'placeholder',
+            session_id: 'none',
+            exercise_id: exerciseId,
+            date: 0,
+            sets: [{ num: 1, reps: 0, weight: 0 }],
+        });
+    }
+    return result;
+}
+let fullExercisePerformance = {};
+function catchExerciseData() {
+    fullExercisePerformance = {};
+    for (let i = 1; i < globalExerciseIdCounter; i++) {
+        fullExercisePerformance[i] = getPastPerformance(i);
+    }
+}
+function getRepRange(exerciseId) {
+    for (const workout of workoutDB) {
+        const exerciseMatch = workout.exercises.find((ex) => ex.exercise_id === exerciseId);
+        if (exerciseMatch) {
+            return [exerciseMatch.reps.min_reps, exerciseMatch.reps.max_reps];
+        }
+    }
+    return null;
+}
+function computePerformance(entry) {
+    let totalScore = 0;
+    let totalReps = 0;
+    entry.sets.forEach((set) => {
+        if (set.weight > 0) {
+            totalScore += set.weight * (1 + set.reps / 30);
+            totalReps += set.reps;
+        }
+        else {
+            totalScore += set.reps;
+            totalReps += set.reps;
+        }
+    });
+    const averageScore = Math.round((totalScore * 10) / entry.sets.length) / 10;
+    const averageReps = Math.round((totalReps * 10) / entry.sets.length) / 10;
+    return [averageScore, averageReps];
+}
+function analysePerformance(exerciseId) {
+    var _a;
+    if (Object.keys(fullExercisePerformance).length === 0)
+        catchExerciseData();
+    let performance = fullExercisePerformance[exerciseId];
+    if (!performance || performance.length < 2 || ((_a = performance[0]) === null || _a === void 0 ? void 0 : _a.session_id) === 'none') {
+        throw new Error('Not enough data for this exercise.');
+    }
+    console.log(performance);
+    let statusCode = 'bad';
+    let reportCode = 0;
+    let newPerformance = computePerformance(performance[0]);
+    let oldPerformance = computePerformance(performance[1]);
+    if (newPerformance[0] > oldPerformance[0])
+        statusCode = 'good';
+    else
+        statusCode = 'bad';
+    const repRange = getRepRange(exerciseId);
+    let min = 0, max = 0;
+    if (repRange) {
+        [min, max] = repRange;
+    }
+    else
+        throw new Error('Invalid Exercise ID.');
+    if (newPerformance[1] < min)
+        reportCode = -1;
+    else if (newPerformance[1] > max)
+        reportCode = 1;
+    else
+        reportCode = 0;
+    return {
+        exercise_id: exerciseId,
+        status: statusCode,
+        report_code: reportCode,
+    };
+}
 let mySessions = [];
 let myExerciseInstances = [];
 const FILE_NAME = 'workout-data.json';
@@ -504,7 +593,7 @@ export function exportWorkoutData() {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            console.log('File successfully downloaded to your computer!');
+            console.log('File successfully downloaded to your computer.');
             return;
         }
         try {
