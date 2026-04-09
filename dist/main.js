@@ -8,6 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 let activeWorkoutState = [];
 function createNewSet(i) {
     return `
@@ -55,24 +56,28 @@ function initialiseSchemaFromDOM() {
             const exerciseName = nameElement.innerText.replace('SS', '').trim();
             const exerciseRangeElement = li.querySelector('.exercise-range');
             const [setNumber, repRange] = exerciseRangeElement.innerText.split(' x ');
+            const [minReps, maxReps] = repRange.split('-');
             let exerciseObj = exerciseDB.find((e) => e.name === exerciseName);
             if (!exerciseObj) {
                 exerciseObj = {
                     exercise_id: globalExerciseIdCounter++,
                     name: exerciseName,
                     muscle: muscleGroup,
-                    set_num: parseInt(setNumber),
-                    rep_range: repRange,
                 };
                 exerciseDB.push(exerciseObj);
                 hasNewExercises = true;
             }
             else {
                 exerciseObj.muscle = muscleGroup;
-                exerciseObj.set_num = parseInt(setNumber);
-                exerciseObj.rep_range = repRange;
             }
-            exercisesForThisWorkout.push(exerciseObj);
+            exercisesForThisWorkout.push({
+                exercise_id: exerciseObj.exercise_id,
+                set_num: parseInt(setNumber, 10),
+                reps: {
+                    min_reps: parseInt(minReps, 10),
+                    max_reps: parseInt(maxReps, 10),
+                },
+            });
         });
         workoutDB.push({
             workout_id: workoutId,
@@ -83,7 +88,6 @@ function initialiseSchemaFromDOM() {
     if (hasNewExercises) {
         saveWorkoutData().catch((e) => console.error('Background dictionary save failed', e));
     }
-    console.log('Schema Successfully Hydrated! Master Dictionary Length:', exerciseDB.length);
 }
 window.addEventListener('DOMContentLoaded', () => __awaiter(void 0, void 0, void 0, function* () {
     yield loadWorkoutData();
@@ -250,8 +254,14 @@ function renderWorkoutForm(workout) {
     if (!daySelectionContainer)
         return;
     daySelectionContainer.classList.add('border-b', 'border-border', 'pb-4', 'mb-4');
-    activeWorkoutState = workout.exercises.map((exercise) => {
-        const totalSets = exercise.set_num ? exercise.set_num : 3;
+    const joinedExercises = workout.exercises
+        .map((prescription) => {
+        const details = exerciseDB.find((e) => e.exercise_id === prescription.exercise_id);
+        return Object.assign(Object.assign({}, details), prescription);
+    })
+        .filter((e) => e.name !== undefined);
+    activeWorkoutState = joinedExercises.map((exercise) => {
+        const totalSets = exercise.set_num || 3;
         const initialSets = [];
         for (let i = 1; i <= totalSets; i++) {
             initialSets.push({ num: i, reps: 0, weight: 0 });
@@ -268,7 +278,7 @@ function renderWorkoutForm(workout) {
       <p class="text-accent text-center">Kg</p>
     </div>
   `;
-    workout.exercises.forEach((exercise) => {
+    joinedExercises.forEach((exercise) => {
         const row = document.createElement('div');
         row.className = 'workout-log-entry grid gap-3 items-center align-middle';
         row.style.gridTemplateColumns = '1fr 5% 12.5% 12.5%';
@@ -288,7 +298,7 @@ function renderWorkoutForm(workout) {
         </svg>
       </button>
       <p class="exercise-reps w-full bg-transparent border border-border text-white rounded-lg text-center py-2.5 max-[550px]:py-1.5 max-[550px]:text-xs max-[440px]:py-1 max-[440px]:text-[10px] focus:ring-accent focus:border-accent appearance-none m-0 min-w-0">
-        ${exercise.rep_range}
+        ${exercise.reps.min_reps}-${exercise.reps.max_reps}
       </p>
       <p class="exercise-weight w-full bg-transparent border border-border text-white rounded-lg text-center py-2.5 max-[550px]:py-1.5 max-[550px]:text-xs max-[440px]:py-1 max-[440px]:text-[10px] focus:ring-accent focus:border-accent appearance-none m-0 min-w-0">
         0.0 
@@ -298,7 +308,7 @@ function renderWorkoutForm(workout) {
         dropdownContainer.className = 'dropdown-content w-full hidden flex flex-col gap-2 bg-surface border-b border-t border-border pt-2';
         dropdownContainer.style.gridColumn = '1 / -1';
         let setsHTML = '';
-        const totalSets = exercise.set_num ? exercise.set_num : 3;
+        const totalSets = exercise.set_num || 3;
         for (let i = 1; i <= totalSets; i++) {
             setsHTML += createNewSet(i);
         }
@@ -323,40 +333,47 @@ function renderWorkoutForm(workout) {
         workoutLogContainer.appendChild(row);
     });
     const saveButtonRow = document.createElement('div');
-    saveButtonRow.className = 'mt-5 flex justify-center';
+    saveButtonRow.className = 'mt-5 flex flex-row justify-center gap-3';
     saveButtonRow.innerHTML = `
-    <button id="save-workout-btn" class="bg-surface border border-accent text-accent font-bold uppercase tracking-wider px-4 py-2  rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">
+    <button id="save-workout-btn" class="bg-surface border border-accent text-accent font-bold uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">
       Save Workout
+    </button>
+    <button id="export-workout-btn" class="bg-surface border border-accent text-accent font-bold uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">
+      Export Data 
     </button>
   `;
     workoutLogContainer.appendChild(saveButtonRow);
     const saveBtn = document.getElementById('save-workout-btn');
+    let activeSessionId = null;
     if (saveBtn) {
         saveBtn.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
             const button = e.target;
             button.disabled = true;
             button.innerText = 'Saving...';
             const datePrefix = new Date().toISOString().split('T')[0];
-            const currentSessionId = `${datePrefix}-${Date.now()}`;
-            const newSession = {
-                session_id: currentSessionId,
-                workout_id: workout.workout_id,
-                date: new Date().toISOString(),
-            };
+            if (!activeSessionId) {
+                activeSessionId = `${datePrefix}-${Date.now()}`;
+                const newSession = {
+                    session_id: activeSessionId,
+                    workout_id: workout.workout_id,
+                    date: new Date().toISOString(),
+                };
+                mySessions.push(newSession);
+            }
+            myExerciseInstances = myExerciseInstances.filter((instance) => instance.session_id !== activeSessionId);
             let instanceIdCounter = 1;
             activeWorkoutState.forEach((exerciseState) => {
                 const validSets = exerciseState.sets.filter((set) => set.reps > 0);
                 if (validSets.length > 0) {
                     const newInstance = {
-                        instance_id: `${currentSessionId}-${instanceIdCounter++}`,
-                        session_id: currentSessionId,
+                        instance_id: `${activeSessionId}-${instanceIdCounter++}`,
+                        session_id: activeSessionId,
                         exercise_id: exerciseState.exercise_id,
                         sets: validSets,
                     };
                     myExerciseInstances.push(newInstance);
                 }
             });
-            mySessions.push(newSession);
             yield saveWorkoutData();
             button.innerText = 'Saved!';
             button.classList.replace('text-accent', 'text-green-500');
@@ -369,22 +386,41 @@ function renderWorkoutForm(workout) {
             }, 2000);
         }));
     }
+    const exportBtn = document.getElementById('export-workout-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+            const button = e.target;
+            button.disabled = true;
+            button.innerText = 'Exporting...';
+            yield exportWorkoutData();
+            button.innerText = 'Exported!';
+            button.classList.replace('text-accent', 'text-green-500');
+            button.classList.replace('border-accent', 'border-green-500');
+            setTimeout(() => {
+                button.disabled = false;
+                button.innerText = 'Export Data';
+                button.classList.replace('text-green-500', 'text-accent');
+                button.classList.replace('border-green-500', 'border-accent');
+            }, 2000);
+        }));
+    }
 }
 let mySessions = [];
 let myExerciseInstances = [];
 const FILE_NAME = 'workout-data.json';
-function loadWorkoutData() {
+export function loadWorkoutData() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const contents = yield Filesystem.readFile({
                 path: FILE_NAME,
-                directory: Directory.Documents,
+                directory: Directory.Data,
                 encoding: Encoding.UTF8,
             });
             const data = JSON.parse(contents.data);
             mySessions = data.sessions || [];
             myExerciseInstances = data.instances || [];
             exerciseDB = data.exercises || [];
+            workoutDB = data.workouts || [];
             if (exerciseDB.length > 0) {
                 const maxId = Math.max(...exerciseDB.map((e) => e.exercise_id));
                 globalExerciseIdCounter = maxId + 1;
@@ -399,29 +435,99 @@ function loadWorkoutData() {
             mySessions = [];
             myExerciseInstances = [];
             exerciseDB = [];
+            workoutDB = [];
             globalExerciseIdCounter = 1;
         }
     });
 }
-function saveWorkoutData() {
+let isSaving = false;
+export function saveWorkoutData() {
     return __awaiter(this, void 0, void 0, function* () {
+        if (isSaving)
+            return;
+        isSaving = true;
+        const cleanExerciseDB = exerciseDB.map((ex) => ({
+            exercise_id: ex.exercise_id,
+            name: ex.name,
+            muscle: ex.muscle,
+        }));
         const dataToSave = {
+            workouts: workoutDB,
             sessions: mySessions,
             instances: myExerciseInstances,
-            exercises: exerciseDB,
+            exercises: cleanExerciseDB,
         };
         try {
             yield Filesystem.writeFile({
                 path: FILE_NAME,
                 data: JSON.stringify(dataToSave, null, 2),
-                directory: Directory.Documents,
+                directory: Directory.Data,
                 encoding: Encoding.UTF8,
             });
-            console.log('Workout securely saved to local device!');
+            console.log('Workout securely saved!');
         }
         catch (err) {
             console.error('Error writing file:', err);
-            alert(`Failed to save to device: ${err.message}`);
+            if (err.message.includes('closing')) {
+                console.warn('Database busy, save postponed.');
+            }
+            else {
+                alert(`Failed to save database: ${err.message}`);
+            }
+        }
+        finally {
+            isSaving = false;
+        }
+    });
+}
+export function exportWorkoutData() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const exportPayload = {
+            workouts: workoutDB,
+            sessions: mySessions,
+            instances: myExerciseInstances,
+            exercises: exerciseDB,
+        };
+        const jsonString = JSON.stringify(exportPayload, null, 2);
+        const dateString = new Date().toISOString().split('T')[0];
+        const exportFileName = `WorkoutBackup_${dateString}.json`;
+        const FOLDER_NAME = 'WorkoutAppBackups';
+        if (Capacitor.getPlatform() === 'web') {
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = exportFileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            console.log('File successfully downloaded to your computer!');
+            return;
+        }
+        try {
+            try {
+                yield Filesystem.mkdir({
+                    path: FOLDER_NAME,
+                    directory: Directory.Documents,
+                    recursive: false,
+                });
+            }
+            catch (mkdirErr) {
+                console.log('Folder already exists, proceeding to save...');
+            }
+            yield Filesystem.writeFile({
+                path: `${FOLDER_NAME}/${exportFileName}`,
+                data: jsonString,
+                directory: Directory.Documents,
+                encoding: Encoding.UTF8,
+            });
+            alert(`Success! Saved to Documents/${FOLDER_NAME}/${exportFileName}`);
+        }
+        catch (err) {
+            console.error('Error exporting file:', err);
+            alert(`Failed to export backup: ${err.message}`);
         }
     });
 }

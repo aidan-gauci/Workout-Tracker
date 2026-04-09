@@ -1,20 +1,29 @@
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 
 // MUSCLE GAP ANALYSIS
 
 // WORKOUT LOG
+type MuscleGroup = 'chest' | 'biceps' | 'back' | 'triceps' | 'legs' | 'abs' | 'shoulders' | 'forearms';
+
 type Exercise = {
   exercise_id: number;
   name: string;
-  muscle: 'chest' | 'biceps' | 'back' | 'triceps' | 'legs' | 'abs' | 'shoulders' | 'forearms';
-  set_num: number;
-  rep_range: string;
+  muscle: MuscleGroup;
+  is_deleted?: boolean;
 };
 
 type Workout = {
   workout_id: number;
   name: string;
-  exercises: Exercise[];
+  exercises: {
+    exercise_id: number;
+    set_num: number;
+    reps: {
+      min_reps: number;
+      max_reps: number;
+    };
+  }[];
 };
 
 type WorkoutInstance = {
@@ -75,23 +84,26 @@ function initialiseSchemaFromDOM() {
   articles.forEach((article, index) => {
     const workoutName = article.querySelector('h2')?.innerText.trim() || `Workout ${index + 1}`;
     const workoutId = index + 1;
-    const exercisesForThisWorkout: Exercise[] = [];
+
+    const exercisesForThisWorkout: Workout['exercises'] = [];
 
     const listItems = article.querySelectorAll('li');
     listItems.forEach((li) => {
       const nameElement = li.querySelector('.exercise-name') as HTMLElement;
       if (!nameElement) return;
 
-      let muscleGroup: Exercise['muscle'] = 'chest';
+      let muscleGroup: MuscleGroup = 'chest';
       const classes = Array.from(nameElement.classList);
       const muscleClass = classes.find((c) => c.startsWith('text-') && c !== 'text-s' && c !== 'text-sm' && c !== 'text-text');
+
       if (muscleClass) {
-        muscleGroup = muscleClass.replace('text-', '') as Exercise['muscle'];
+        muscleGroup = muscleClass.replace('text-', '') as MuscleGroup;
       }
 
       const exerciseName = nameElement.innerText.replace('SS', '').trim();
       const exerciseRangeElement = li.querySelector('.exercise-range') as HTMLElement;
       const [setNumber, repRange] = exerciseRangeElement.innerText.split(' x ') as [string, string];
+      const [minReps, maxReps] = repRange.split('-') as [string, string];
 
       let exerciseObj = exerciseDB.find((e) => e.name === exerciseName);
 
@@ -100,18 +112,21 @@ function initialiseSchemaFromDOM() {
           exercise_id: globalExerciseIdCounter++,
           name: exerciseName,
           muscle: muscleGroup,
-          set_num: parseInt(setNumber),
-          rep_range: repRange,
         };
         exerciseDB.push(exerciseObj);
         hasNewExercises = true;
       } else {
         exerciseObj.muscle = muscleGroup;
-        exerciseObj.set_num = parseInt(setNumber);
-        exerciseObj.rep_range = repRange;
       }
 
-      exercisesForThisWorkout.push(exerciseObj);
+      exercisesForThisWorkout.push({
+        exercise_id: exerciseObj.exercise_id,
+        set_num: parseInt(setNumber, 10),
+        reps: {
+          min_reps: parseInt(minReps, 10),
+          max_reps: parseInt(maxReps, 10),
+        },
+      });
     });
 
     workoutDB.push({
@@ -124,8 +139,6 @@ function initialiseSchemaFromDOM() {
   if (hasNewExercises) {
     saveWorkoutData().catch((e) => console.error('Background dictionary save failed', e));
   }
-
-  console.log('Schema Successfully Hydrated! Master Dictionary Length:', exerciseDB.length);
 }
 
 // INITIALIZATION & EVENT LISTENERS
@@ -314,8 +327,18 @@ function renderWorkoutForm(workout: Workout) {
 
   daySelectionContainer.classList.add('border-b', 'border-border', 'pb-4', 'mb-4');
 
-  activeWorkoutState = workout.exercises.map((exercise) => {
-    const totalSets = exercise.set_num ? exercise.set_num : 3;
+  const joinedExercises = workout.exercises
+    .map((prescription) => {
+      const details = exerciseDB.find((e) => e.exercise_id === prescription.exercise_id);
+      return {
+        ...details,
+        ...prescription,
+      };
+    })
+    .filter((e) => e.name !== undefined);
+
+  activeWorkoutState = joinedExercises.map((exercise) => {
+    const totalSets = exercise.set_num || 3;
     const initialSets = [];
     for (let i = 1; i <= totalSets; i++) {
       initialSets.push({ num: i, reps: 0, weight: 0 });
@@ -334,7 +357,7 @@ function renderWorkoutForm(workout: Workout) {
     </div>
   `;
 
-  workout.exercises.forEach((exercise) => {
+  joinedExercises.forEach((exercise) => {
     const row = document.createElement('div');
     row.className = 'workout-log-entry grid gap-3 items-center align-middle';
     row.style.gridTemplateColumns = '1fr 5% 12.5% 12.5%';
@@ -355,7 +378,7 @@ function renderWorkoutForm(workout: Workout) {
         </svg>
       </button>
       <p class="exercise-reps w-full bg-transparent border border-border text-white rounded-lg text-center py-2.5 max-[550px]:py-1.5 max-[550px]:text-xs max-[440px]:py-1 max-[440px]:text-[10px] focus:ring-accent focus:border-accent appearance-none m-0 min-w-0">
-        ${exercise.rep_range}
+        ${exercise.reps.min_reps}-${exercise.reps.max_reps}
       </p>
       <p class="exercise-weight w-full bg-transparent border border-border text-white rounded-lg text-center py-2.5 max-[550px]:py-1.5 max-[550px]:text-xs max-[440px]:py-1 max-[440px]:text-[10px] focus:ring-accent focus:border-accent appearance-none m-0 min-w-0">
         0.0 
@@ -367,7 +390,7 @@ function renderWorkoutForm(workout: Workout) {
     dropdownContainer.style.gridColumn = '1 / -1';
 
     let setsHTML = '';
-    const totalSets = exercise.set_num ? exercise.set_num : 3;
+    const totalSets = exercise.set_num || 3;
 
     for (let i = 1; i <= totalSets; i++) {
       setsHTML += createNewSet(i);
@@ -396,15 +419,19 @@ function renderWorkoutForm(workout: Workout) {
   });
 
   const saveButtonRow = document.createElement('div');
-  saveButtonRow.className = 'mt-5 flex justify-center';
+  saveButtonRow.className = 'mt-5 flex flex-row justify-center gap-3';
   saveButtonRow.innerHTML = `
-    <button id="save-workout-btn" class="bg-surface border border-accent text-accent font-bold uppercase tracking-wider px-4 py-2  rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">
+    <button id="save-workout-btn" class="bg-surface border border-accent text-accent font-bold uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">
       Save Workout
+    </button>
+    <button id="export-workout-btn" class="bg-surface border border-accent text-accent font-bold uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">
+      Export Data 
     </button>
   `;
   workoutLogContainer.appendChild(saveButtonRow);
 
   const saveBtn = document.getElementById('save-workout-btn');
+  let activeSessionId: string | null = null;
 
   if (saveBtn) {
     saveBtn.addEventListener('click', async (e) => {
@@ -413,23 +440,26 @@ function renderWorkoutForm(workout: Workout) {
       button.innerText = 'Saving...';
 
       const datePrefix = new Date().toISOString().split('T')[0];
-      const currentSessionId = `${datePrefix}-${Date.now()}`;
 
-      const newSession: WorkoutInstance = {
-        session_id: currentSessionId,
-        workout_id: workout.workout_id,
-        date: new Date().toISOString(),
-      };
+      if (!activeSessionId) {
+        activeSessionId = `${datePrefix}-${Date.now()}`;
+        const newSession: WorkoutInstance = {
+          session_id: activeSessionId,
+          workout_id: workout.workout_id,
+          date: new Date().toISOString(),
+        };
+        mySessions.push(newSession);
+      }
+
+      myExerciseInstances = myExerciseInstances.filter((instance) => instance.session_id !== activeSessionId);
 
       let instanceIdCounter = 1;
-
       activeWorkoutState.forEach((exerciseState) => {
         const validSets = exerciseState.sets.filter((set) => set.reps > 0);
-
         if (validSets.length > 0) {
           const newInstance: ExerciseInstance = {
-            instance_id: `${currentSessionId}-${instanceIdCounter++}`,
-            session_id: currentSessionId,
+            instance_id: `${activeSessionId}-${instanceIdCounter++}`,
+            session_id: activeSessionId as string,
             exercise_id: exerciseState.exercise_id,
             sets: validSets,
           };
@@ -437,10 +467,7 @@ function renderWorkoutForm(workout: Workout) {
         }
       });
 
-      mySessions.push(newSession);
-
       await saveWorkoutData();
-
       button.innerText = 'Saved!';
       button.classList.replace('text-accent', 'text-green-500');
       button.classList.replace('border-accent', 'border-green-500');
@@ -448,6 +475,26 @@ function renderWorkoutForm(workout: Workout) {
       setTimeout(() => {
         button.disabled = false;
         button.innerText = 'Save Workout';
+        button.classList.replace('text-green-500', 'text-accent');
+        button.classList.replace('border-green-500', 'border-accent');
+      }, 2000);
+    });
+  }
+
+  const exportBtn = document.getElementById('export-workout-btn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', async (e) => {
+      const button = e.target as HTMLButtonElement;
+      button.disabled = true;
+      button.innerText = 'Exporting...';
+      await exportWorkoutData();
+      button.innerText = 'Exported!';
+      button.classList.replace('text-accent', 'text-green-500');
+      button.classList.replace('border-accent', 'border-green-500');
+
+      setTimeout(() => {
+        button.disabled = false;
+        button.innerText = 'Export Data';
         button.classList.replace('text-green-500', 'text-accent');
         button.classList.replace('border-green-500', 'border-accent');
       }, 2000);
@@ -462,11 +509,11 @@ let myExerciseInstances: ExerciseInstance[] = [];
 
 const FILE_NAME = 'workout-data.json';
 
-async function loadWorkoutData() {
+export async function loadWorkoutData() {
   try {
     const contents = await Filesystem.readFile({
       path: FILE_NAME,
-      directory: Directory.Documents,
+      directory: Directory.Data,
       encoding: Encoding.UTF8,
     });
 
@@ -474,8 +521,8 @@ async function loadWorkoutData() {
 
     mySessions = data.sessions || [];
     myExerciseInstances = data.instances || [];
-
     exerciseDB = data.exercises || [];
+    workoutDB = data.workouts || [];
 
     if (exerciseDB.length > 0) {
       const maxId = Math.max(...exerciseDB.map((e) => e.exercise_id));
@@ -490,28 +537,103 @@ async function loadWorkoutData() {
     mySessions = [];
     myExerciseInstances = [];
     exerciseDB = [];
+    workoutDB = [];
     globalExerciseIdCounter = 1;
   }
 }
 
-async function saveWorkoutData() {
+let isSaving = false;
+
+export async function saveWorkoutData() {
+  if (isSaving) return;
+  isSaving = true;
+
+  const cleanExerciseDB = exerciseDB.map((ex) => ({
+    exercise_id: ex.exercise_id,
+    name: ex.name,
+    muscle: ex.muscle,
+  }));
+
   const dataToSave = {
+    workouts: workoutDB,
     sessions: mySessions,
     instances: myExerciseInstances,
-    exercises: exerciseDB,
+    exercises: cleanExerciseDB,
   };
 
   try {
     await Filesystem.writeFile({
       path: FILE_NAME,
       data: JSON.stringify(dataToSave, null, 2),
+      directory: Directory.Data,
+      encoding: Encoding.UTF8,
+    });
+
+    console.log('Workout securely saved!');
+  } catch (err: any) {
+    console.error('Error writing file:', err);
+    if (err.message.includes('closing')) {
+      console.warn('Database busy, save postponed.');
+    } else {
+      alert(`Failed to save database: ${err.message}`);
+    }
+  } finally {
+    isSaving = false;
+  }
+}
+
+export async function exportWorkoutData() {
+  const exportPayload = {
+    workouts: workoutDB,
+    sessions: mySessions,
+    instances: myExerciseInstances,
+    exercises: exerciseDB,
+  };
+
+  const jsonString = JSON.stringify(exportPayload, null, 2);
+  const dateString = new Date().toISOString().split('T')[0];
+  const exportFileName = `WorkoutBackup_${dateString}.json`;
+  const FOLDER_NAME = 'WorkoutAppBackups';
+
+  if (Capacitor.getPlatform() === 'web') {
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = exportFileName;
+
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    console.log('File successfully downloaded to your computer!');
+    return;
+  }
+
+  try {
+    try {
+      await Filesystem.mkdir({
+        path: FOLDER_NAME,
+        directory: Directory.Documents,
+        recursive: false,
+      });
+    } catch (mkdirErr) {
+      console.log('Folder already exists, proceeding to save...');
+    }
+
+    await Filesystem.writeFile({
+      path: `${FOLDER_NAME}/${exportFileName}`,
+      data: jsonString,
       directory: Directory.Documents,
       encoding: Encoding.UTF8,
     });
 
-    console.log('Workout securely saved to local device!');
+    alert(`Success! Saved to Documents/${FOLDER_NAME}/${exportFileName}`);
   } catch (err: any) {
-    console.error('Error writing file:', err);
-    alert(`Failed to save to device: ${err.message}`);
+    console.error('Error exporting file:', err);
+    alert(`Failed to export backup: ${err.message}`);
   }
 }
