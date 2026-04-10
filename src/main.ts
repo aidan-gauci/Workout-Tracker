@@ -604,44 +604,82 @@ function computePerformance(entry: PerformanceEntry): [number, number] {
   return [averageScore, averageReps];
 }
 
-function analysePerformance(exerciseId: number): AnalysisReport {
-  if (Object.keys(fullExercisePerformance).length === 0) catchExerciseData();
+function analysePerformance(exerciseId: number): AnalysisReport | null {
+  try {
+    if (Object.keys(fullExercisePerformance).length === 0) catchExerciseData();
 
-  let performance = fullExercisePerformance[exerciseId];
+    let performance = fullExercisePerformance[exerciseId];
 
-  if (!performance || performance.length < 2 || performance[0]?.session_id === 'none') {
-    throw new Error('Not enough data for this exercise.');
+    if (!performance || performance.length < 2 || performance[0]?.session_id === 'none') {
+      throw new Error('Not enough data for this exercise.');
+    }
+
+    console.log(performance);
+
+    let statusCode: 'good' | 'bad' = 'bad';
+    let reportCode: -1 | 0 | 1 = 0;
+
+    let newPerformance = computePerformance(performance[0] as PerformanceEntry);
+    let oldPerformance = computePerformance(performance[1] as PerformanceEntry);
+
+    if (newPerformance[0] > oldPerformance[0]) statusCode = 'good';
+    else statusCode = 'bad';
+
+    const repRange = getRepRange(exerciseId);
+
+    let min: number = 0;
+    let max: number = 0;
+
+    if (repRange) {
+      [min, max] = repRange as [number, number];
+    } else {
+      throw new Error('Invalid Exercise ID or missing rep range.');
+    }
+
+    if (newPerformance[1] < min) reportCode = -1;
+    else if (newPerformance[1] > max) reportCode = 1;
+    else reportCode = 0;
+
+    return {
+      exercise_id: exerciseId,
+      status: statusCode,
+      report_code: reportCode,
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      console.warn(`Analysis skipped for Exercise ${exerciseId}: ${error.message}`);
+    } else {
+      console.error('An unknown error occurred during analysis.', error);
+    }
+
+    return null;
   }
+}
 
-  console.log(performance);
+// IMPLEMENTING ANALYSIS
 
-  let statusCode: 'good' | 'bad' = 'bad';
-  let reportCode: -1 | 0 | 1 = 0;
+function catchWorkoutAnalysis(workoutId: number): AnalysisReport[] {
+  const workout = workoutDB.find((workout) => workout.workout_id === workoutId);
+  const workoutAnalysis: AnalysisReport[] = [];
+  let tempAnalysis: AnalysisReport | null = null;
 
-  let newPerformance = computePerformance(performance[0] as PerformanceEntry);
-  let oldPerformance = computePerformance(performance[1] as PerformanceEntry);
+  workout?.exercises.forEach((exercise) => {
+    tempAnalysis = analysePerformance(exercise.exercise_id);
+    if (tempAnalysis) workoutAnalysis.push(tempAnalysis);
+  });
 
-  if (newPerformance[0] > oldPerformance[0]) statusCode = 'good';
-  else statusCode = 'bad';
+  return workoutAnalysis;
+}
 
-  const repRange = getRepRange(exerciseId);
+function catchLiveAnalysis(activeInstances: ExerciseInstance[]): AnalysisReport[] {
+  const liveAnalysis: AnalysisReport[] = [];
 
-  let min: number = 0,
-    max: number = 0;
+  activeInstances.forEach((instance) => {
+    const analysis = analysePerformance(instance.exercise_id);
+    if (analysis) liveAnalysis.push(analysis);
+  });
 
-  if (repRange) {
-    [min, max] = repRange as [number, number];
-  } else throw new Error('Invalid Exercise ID.');
-
-  if (newPerformance[1] < min) reportCode = -1;
-  else if (newPerformance[1] > max) reportCode = 1;
-  else reportCode = 0;
-
-  return {
-    exercise_id: exerciseId,
-    status: statusCode,
-    report_code: reportCode,
-  };
+  return liveAnalysis;
 }
 
 // DATA STORAGE
