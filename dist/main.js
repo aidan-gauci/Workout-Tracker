@@ -76,8 +76,12 @@ window.addEventListener('DOMContentLoaded', () => __awaiter(void 0, void 0, void
     setupGlobalEventListeners();
 }));
 function setupGlobalEventListeners() {
+    const workoutAnalysisContainer = document.getElementById('workout-analysis-container');
     const gymDaysDropdown = document.getElementById('gym-days');
     const workoutLogContainer = document.getElementById('workout-log-container');
+    if (workoutAnalysisContainer) {
+        workoutAnalysisContainer.addEventListener('click', handleAnalysisClicks);
+    }
     if (gymDaysDropdown) {
         gymDaysDropdown.addEventListener('change', handleWorkoutSelection);
     }
@@ -86,12 +90,19 @@ function setupGlobalEventListeners() {
         workoutLogContainer.addEventListener('click', handleWorkoutClicks);
     }
 }
+function handleAnalysisClicks(event) {
+    const target = event.target;
+    if (target.closest('#preset-analysis-btn'))
+        initiatePresetAnalysis(target);
+    if (target.closest('#live-analysis-btn'))
+        initiateLiveAnalysis(target);
+}
 function handleWorkoutSelection(event) {
     const selectedValue = event.target.value;
     const workoutId = parseInt(selectedValue.replace('day-', ''));
     const targetWorkout = workoutDB.find((w) => w.workout_id === workoutId);
     if (targetWorkout) {
-        renderWorkoutForm(targetWorkout);
+        renderWorkoutLogForm(targetWorkout);
     }
 }
 function handleWorkoutInput(event) {
@@ -133,6 +144,27 @@ function updateActiveStateData(exerciseId, setNum, target) {
     }
     else if (target.classList.contains('exercise-weight')) {
         set.weight = parseFloat(target.value) || 0;
+    }
+}
+function initiatePresetAnalysis(btn) {
+    if (workoutDB.length === 0) {
+        return showInlineWarning(btn, 'No Workouts Found');
+    }
+    const analysisContainer = document.getElementById('workout-analysis-container');
+    if (analysisContainer) {
+        analysisContainer.classList = 'flex flex-col items-center w-full';
+        analysisContainer.innerHTML = createWorkoutSelectionMenu();
+    }
+}
+function initiateLiveAnalysis(btn) {
+    const hasData = activeWorkoutState.some((ex) => ex.sets.some((s) => s.reps > 0));
+    if (!hasData) {
+        return showInlineWarning(btn, 'Log a set first!');
+    }
+    const analysisContainer = document.getElementById('workout-analysis-container');
+    if (analysisContainer) {
+        analysisContainer.classList = 'flex flex-col items-center w-full';
+        analysisContainer.innerHTML = createLiveConfirmationMenu();
     }
 }
 function toggleSetDropdown(btn) {
@@ -254,6 +286,171 @@ function initActiveState(joinedExercises) {
         };
     });
 }
+function getPastPerformance(exerciseId) {
+    const instances = myExerciseInstances.filter((inst) => inst.exercise_id === exerciseId);
+    const instancesWithDates = instances.map((inst) => {
+        const session = mySessions.find((s) => s.session_id === inst.session_id);
+        return Object.assign(Object.assign({}, inst), { date: session ? new Date(session.date).getTime() : 0 });
+    });
+    instancesWithDates.sort((a, b) => b.date - a.date);
+    let result = instancesWithDates.slice(0, 2);
+    if (result.length === 0) {
+        result.push({
+            instance_id: 'placeholder',
+            session_id: 'none',
+            exercise_id: exerciseId,
+            date: 0,
+            sets: [{ num: 1, reps: 0, weight: 0 }],
+        });
+    }
+    return result;
+}
+let fullExercisePerformance = {};
+function catchExerciseData() {
+    fullExercisePerformance = {};
+    for (let i = 1; i < globalExerciseIdCounter; i++) {
+        fullExercisePerformance[i] = getPastPerformance(i);
+    }
+}
+function getRepRange(exerciseId) {
+    for (const workout of workoutDB) {
+        const exerciseMatch = workout.exercises.find((ex) => ex.exercise_id === exerciseId);
+        if (exerciseMatch) {
+            return [exerciseMatch.reps.min_reps, exerciseMatch.reps.max_reps];
+        }
+    }
+    return null;
+}
+function computePerformance(entry) {
+    let totalScore = 0;
+    let totalReps = 0;
+    entry.sets.forEach((set) => {
+        if (set.weight > 0) {
+            totalScore += set.weight * (1 + set.reps / 30);
+            totalReps += set.reps;
+        }
+        else {
+            totalScore += set.reps;
+            totalReps += set.reps;
+        }
+    });
+    const averageScore = Math.round((totalScore * 10) / entry.sets.length) / 10;
+    const averageReps = Math.round((totalReps * 10) / entry.sets.length) / 10;
+    return [averageScore, averageReps];
+}
+function analysePerformance(exerciseId) {
+    var _a;
+    try {
+        if (Object.keys(fullExercisePerformance).length === 0)
+            catchExerciseData();
+        let performance = fullExercisePerformance[exerciseId];
+        if (!performance || performance.length < 2 || ((_a = performance[0]) === null || _a === void 0 ? void 0 : _a.session_id) === 'none') {
+            throw new Error('Not enough data for this exercise.');
+        }
+        console.log(performance);
+        let statusCode = 'bad';
+        let reportCode = 0;
+        let newPerformance = computePerformance(performance[0]);
+        let oldPerformance = computePerformance(performance[1]);
+        if (newPerformance[0] > oldPerformance[0])
+            statusCode = 'good';
+        else
+            statusCode = 'bad';
+        const repRange = getRepRange(exerciseId);
+        let min = 0;
+        let max = 0;
+        if (repRange) {
+            [min, max] = repRange;
+        }
+        else {
+            throw new Error('Invalid Exercise ID or missing rep range.');
+        }
+        if (newPerformance[1] < min)
+            reportCode = -1;
+        else if (newPerformance[1] > max)
+            reportCode = 1;
+        else
+            reportCode = 0;
+        return {
+            exercise_id: exerciseId,
+            status: statusCode,
+            report_code: reportCode,
+            prev_perf: oldPerformance,
+            curr_perf: newPerformance,
+        };
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            console.warn(`Analysis skipped for Exercise ${exerciseId}: ${error.message}`);
+        }
+        else {
+            console.error('An unknown error occurred during analysis.', error);
+        }
+        return null;
+    }
+}
+function catchWorkoutAnalysis(workoutId) {
+    const workout = workoutDB.find((workout) => workout.workout_id === workoutId);
+    const workoutAnalysis = [];
+    let tempAnalysis = null;
+    workout === null || workout === void 0 ? void 0 : workout.exercises.forEach((exercise) => {
+        tempAnalysis = analysePerformance(exercise.exercise_id);
+        if (tempAnalysis)
+            workoutAnalysis.push(tempAnalysis);
+    });
+    return workoutAnalysis;
+}
+function catchLiveAnalysis(activeInstances) {
+    const liveAnalysis = [];
+    activeInstances.forEach((instance) => {
+        const analysis = analysePerformance(instance.exercise_id);
+        if (analysis)
+            liveAnalysis.push(analysis);
+    });
+    return liveAnalysis;
+}
+function createWorkoutSelectionMenu() {
+    return `
+    <label for="preset-analysis-dropdown" class="block text-sm font-bold text-muted uppercase tracking-wider mb-2">Select a Preset to Analyse</label>
+    <div class="relative">
+      <select id="preset-analysis-dropdown" class="block w-full bg-surface border border-border text-white text-sm rounded-lg focus:ring-orange-600 focus:border-orange-600 p-2.5 appearance-none cursor-pointer">
+        <option selected disabled class="text-center">Choose a Day</option>
+        <option value="day-1">1. Chest & Biceps</option>
+        <option value="day-2">2. Back & Triceps</option>
+        <option value="day-3">3. Legs & Abs</option>
+        <option value="day-4">4. Shoulders & Arms</option>
+        <option value="day-5">5. Chest & Back</option>
+        <option value="day-6">6. Legs & Abs</option>
+      </select>
+
+      <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+        <svg class="fill-current h-4 w-4" viewBox="0 0 20 20">
+          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+        </svg>
+      </div>
+    </div>
+    
+    <div class="flex flex-row gap-3">
+      <button id="cancel-preset-analysis-btn" class="">Cancel</button>
+      <button id="confirm-preset-analysis-btn" class="">Analyze Workout</button>
+    </div>
+  `;
+}
+function createLiveConfirmationMenu() {
+    return `
+    <div id="live-confirmation-container" class="flex flex-col items-center w-full">
+      
+      <h3 class="">Are you finished logging?</h3>
+      <p class="">Ensure all sets and weights are updated before running your live analysis.</p>
+
+      <div class="flex flex-row gap-3">
+        <button id="cancel-live-analysis-btn" class="">Go Back</button>
+        <button id="confirm-live-analysis-btn" class="">Run Analysis</button>
+      </div>
+
+    </div>
+  `;
+}
 function createLogHeader() {
     return `
     <div class="text-lg max-[440px]:text-base font-bold grid grid-cols-[1fr_7.5%_12.5%_12.5%] gap-3 items-center pb-4 border-b border-border" style="grid-template-columns: 1fr 12.5% 12.5%">
@@ -337,13 +534,13 @@ function createNewSet(i) {
     </div>
   `;
 }
-function setupActionButtons(workoutId, container) {
+function setActionButtons(workoutId, container) {
     var _a, _b;
     const saveButtonRow = document.createElement('div');
     saveButtonRow.className = 'mt-5 flex flex-row justify-center gap-3';
     saveButtonRow.innerHTML = `
-    <button id="save-workout-btn" class="bg-surface border border-accent text-accent font-bold uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Save Workout</button>
-    <button id="export-workout-btn" class="bg-surface border border-accent text-accent font-bold uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Export Data</button>
+    <button id="save-workout-btn" class="bg-surface border border-accent text-accent font-bold max-[550px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Save Workout</button>
+    <button id="export-workout-btn" class="bg-surface border border-accent text-accent font-bold max-[550px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Export Data</button>
   `;
     container.appendChild(saveButtonRow);
     let activeSessionId = null;
@@ -392,7 +589,7 @@ function setButtonSuccessState(btn, successText, defaultText) {
         btn.classList.replace('border-green-500', 'border-accent');
     }, 2000);
 }
-function renderWorkoutForm(workout) {
+function renderWorkoutLogForm(workout) {
     const workoutLogContainer = document.getElementById('workout-log-container');
     const daySelectionContainer = document.getElementById('log-selection-container');
     if (!workoutLogContainer || !daySelectionContainer)
@@ -405,95 +602,7 @@ function renderWorkoutForm(workout) {
         const rowElement = createExerciseRow(exercise);
         workoutLogContainer.appendChild(rowElement);
     });
-    setupActionButtons(workout.workout_id, workoutLogContainer);
-}
-function getPastPerformance(exerciseId) {
-    const instances = myExerciseInstances.filter((inst) => inst.exercise_id === exerciseId);
-    const instancesWithDates = instances.map((inst) => {
-        const session = mySessions.find((s) => s.session_id === inst.session_id);
-        return Object.assign(Object.assign({}, inst), { date: session ? new Date(session.date).getTime() : 0 });
-    });
-    instancesWithDates.sort((a, b) => b.date - a.date);
-    let result = instancesWithDates.slice(0, 2);
-    if (result.length === 0) {
-        result.push({
-            instance_id: 'placeholder',
-            session_id: 'none',
-            exercise_id: exerciseId,
-            date: 0,
-            sets: [{ num: 1, reps: 0, weight: 0 }],
-        });
-    }
-    return result;
-}
-let fullExercisePerformance = {};
-function catchExerciseData() {
-    fullExercisePerformance = {};
-    for (let i = 1; i < globalExerciseIdCounter; i++) {
-        fullExercisePerformance[i] = getPastPerformance(i);
-    }
-}
-function getRepRange(exerciseId) {
-    for (const workout of workoutDB) {
-        const exerciseMatch = workout.exercises.find((ex) => ex.exercise_id === exerciseId);
-        if (exerciseMatch) {
-            return [exerciseMatch.reps.min_reps, exerciseMatch.reps.max_reps];
-        }
-    }
-    return null;
-}
-function computePerformance(entry) {
-    let totalScore = 0;
-    let totalReps = 0;
-    entry.sets.forEach((set) => {
-        if (set.weight > 0) {
-            totalScore += set.weight * (1 + set.reps / 30);
-            totalReps += set.reps;
-        }
-        else {
-            totalScore += set.reps;
-            totalReps += set.reps;
-        }
-    });
-    const averageScore = Math.round((totalScore * 10) / entry.sets.length) / 10;
-    const averageReps = Math.round((totalReps * 10) / entry.sets.length) / 10;
-    return [averageScore, averageReps];
-}
-function analysePerformance(exerciseId) {
-    var _a;
-    if (Object.keys(fullExercisePerformance).length === 0)
-        catchExerciseData();
-    let performance = fullExercisePerformance[exerciseId];
-    if (!performance || performance.length < 2 || ((_a = performance[0]) === null || _a === void 0 ? void 0 : _a.session_id) === 'none') {
-        throw new Error('Not enough data for this exercise.');
-    }
-    console.log(performance);
-    let statusCode = 'bad';
-    let reportCode = 0;
-    let newPerformance = computePerformance(performance[0]);
-    let oldPerformance = computePerformance(performance[1]);
-    if (newPerformance[0] > oldPerformance[0])
-        statusCode = 'good';
-    else
-        statusCode = 'bad';
-    const repRange = getRepRange(exerciseId);
-    let min = 0, max = 0;
-    if (repRange) {
-        [min, max] = repRange;
-    }
-    else
-        throw new Error('Invalid Exercise ID.');
-    if (newPerformance[1] < min)
-        reportCode = -1;
-    else if (newPerformance[1] > max)
-        reportCode = 1;
-    else
-        reportCode = 0;
-    return {
-        exercise_id: exerciseId,
-        status: statusCode,
-        report_code: reportCode,
-    };
+    setActionButtons(workout.workout_id, workoutLogContainer);
 }
 let mySessions = [];
 let myExerciseInstances = [];
