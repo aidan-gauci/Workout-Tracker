@@ -220,11 +220,40 @@ function initiatePresetAnalysis(btn: HTMLButtonElement) {
   }
 
   const analysisContainer = document.querySelector('#workout-analysis-container');
+  if (!analysisContainer) return;
 
-  if (analysisContainer) {
-    analysisContainer.classList = 'flex flex-col items-center w-full';
-    analysisContainer.innerHTML = createWorkoutSelectionMenu();
-  }
+  analysisContainer.classList = 'flex flex-col items-center w-full';
+  analysisContainer.innerHTML = renderDashboardResults(catchDashboardAnalysis());
+
+  document.querySelector('#analysis-back-btn')?.addEventListener('click', () => {
+    analysisContainer.classList = 'flex flex-row justify-center gap-[7.5%] p-4';
+    analysisContainer.innerHTML = returnToAnalysisMenu();
+  });
+
+  setupDashboardFilters(analysisContainer as HTMLDivElement);
+}
+
+function setupDashboardFilters(container: HTMLDivElement) {
+  let activeMuscle: MuscleGroup | undefined = undefined;
+  let activeWorkout: number | undefined = undefined;
+
+  const rerender = () => {
+    const results = catchDashboardAnalysis(activeMuscle, activeWorkout);
+    const resultsContainer = container.querySelector('#dashboard-results') as HTMLElement;
+    if (resultsContainer) resultsContainer.innerHTML = renderDashboardCards(results);
+  };
+
+  container.querySelector('#muscle-filter')?.addEventListener('change', (e) => {
+    const val = (e.target as HTMLSelectElement).value;
+    activeMuscle = val ? (val as MuscleGroup) : undefined;
+    rerender();
+  });
+
+  container.querySelector('#workout-filter')?.addEventListener('change', (e) => {
+    const val = (e.target as HTMLSelectElement).value;
+    activeWorkout = val ? parseInt(val) : undefined;
+    rerender();
+  });
 }
 
 function initiateLiveAnalysis(btn: HTMLButtonElement) {
@@ -235,9 +264,42 @@ function initiateLiveAnalysis(btn: HTMLButtonElement) {
   }
 
   const analysisContainer = document.querySelector('#workout-analysis-container');
+
   if (analysisContainer) {
-    analysisContainer.classList = 'flex flex-col items-center w-full';
+    analysisContainer.className = 'flex flex-col items-center w-full';
     analysisContainer.innerHTML = createLiveConfirmationMenu();
+
+    const confirmBtn = document.querySelector('#confirm-live-analysis-btn') as HTMLButtonElement;
+    const cancelBtn = document.querySelector('#cancel-live-analysis-btn') as HTMLButtonElement;
+
+    cancelBtn?.addEventListener('click', () => {
+      analysisContainer.className = 'flex flex-row justify-center gap-[7.5%] p-4';
+      analysisContainer.innerHTML = returnToAnalysisMenu();
+    });
+
+    confirmBtn?.addEventListener('click', () => {
+      const activeInstances = activeWorkoutState.map((ex) => ({
+        instance_id: '',
+        session_id: '',
+        exercise_id: ex.exercise_id,
+        sets: ex.sets,
+      }));
+
+      const results = catchLiveAnalysis(activeInstances);
+
+      if (results.length === 0) {
+        confirmBtn.classList.add('w-fit');
+        showInlineWarning(confirmBtn, 'No Data Available');
+        return;
+      }
+
+      analysisContainer.innerHTML = renderLiveAnalysisResults(results);
+
+      document.querySelector('#analysis-back-btn')?.addEventListener('click', () => {
+        analysisContainer.className = 'flex flex-row justify-center gap-[7.5%] p-4';
+        analysisContainer.innerHTML = returnToAnalysisMenu();
+      });
+    });
   }
 }
 
@@ -354,7 +416,7 @@ function toggleAddExerciseDropdown(btn: HTMLButtonElement) {
         .map(
           (e) => `
         <li 
-          class="exercise-option px-3 py-2 text-sm max-[550px]:text-xs max-[440px]:text-[10px] text-${'text-' + e.muscle} cursor-pointer hover:bg-border transition-colors duration-150"
+          class="exercise-option px-3 py-2 text-sm max-[550px]:text-xs max-[440px]:text-[10px] text-${'color-' + e.muscle} cursor-pointer hover:bg-border transition-colors duration-150"
           data-exercise-id="${e.exercise_id}"
         >
           ${e.name}
@@ -463,6 +525,29 @@ function addSet(btn: HTMLButtonElement) {
   } else {
     showInlineWarning(btn, 'Max 5 Sets');
   }
+}
+
+function triggerImport(btn: HTMLButtonElement) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setButtonLoadingState(btn, 'Importing...');
+
+    try {
+      await importWorkoutData(file);
+      setButtonSuccessState(btn, 'Imported!', 'Import Data');
+    } catch (err: any) {
+      btn.disabled = false;
+      showInlineWarning(btn, err.message || 'Import Failed');
+    }
+  });
+
+  input.click();
 }
 
 // UI STATE HANDLERS
@@ -722,9 +807,26 @@ function catchLiveAnalysis(activeInstances: ExerciseInstance[]): AnalysisReport[
 
 // COMPONENT GENERATORS
 
+function returnToAnalysisMenu(): string {
+  return `
+    <button
+      id="live-analysis-btn"
+      class="w-56 max-[600px]:w-32 border border-border rounded-lg text-xl max-[600px]:text-lg max-[440px]:text-base font-bold text-text p-4 cursor-pointer hover:scale-105 transition-all duration-200 ease-in-out"
+    >
+      By Live Workout
+    </button>
+    <button
+      id="preset-analysis-btn"
+      class="w-56 max-[600px]:w-32 border border-border rounded-lg text-xl max-[600px]:text-lg max-[440px]:text-base font-bold text-text p-4 cursor-pointer hover:scale-105 transition-all duration-200 ease-in-out"
+    >
+      By Preset Workout
+    </button>
+  `;
+}
+
 function createWorkoutSelectionMenu(): string {
   return `
-    <label for="preset-analysis-dropdown" class="block text-sm font-bold text-muted uppercase tracking-wider mb-2">Select a Preset to Analyse</label>
+    <label for="preset-analysis-dropdown" class="block text-lg max-[440px]:text-base font-bold text-muted uppercase tracking-wider mb-2">Select a Preset to Analyse</label>
     <div class="relative">
       <select id="preset-analysis-dropdown" class="block w-full bg-surface border border-border text-white text-sm rounded-lg focus:ring-orange-600 focus:border-orange-600 p-2.5 appearance-none cursor-pointer">
         <option selected disabled class="text-center">Choose a Day</option>
@@ -735,35 +837,229 @@ function createWorkoutSelectionMenu(): string {
         <option value="day-5">5. Chest & Back</option>
         <option value="day-6">6. Legs & Abs</option>
       </select>
-
       <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
         <svg class="fill-current h-4 w-4" viewBox="0 0 20 20">
           <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
         </svg>
       </div>
     </div>
-    
-    <div class="flex flex-row gap-3">
-      <button id="cancel-preset-analysis-btn" class="">Cancel</button>
-      <button id="confirm-preset-analysis-btn" class="">Analyze Workout</button>
+    <div class="flex flex-row gap-3 mt-3">
+      <button id="cancel-preset-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out cursor-pointer">Back</button>
+      <button id="confirm-preset-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out cursor-pointer">Analyse</button>
     </div>
   `;
+}
+
+function renderDashboardResults(results: DashboardEntry[]): string {
+  const backButton = `
+    <button id="analysis-back-btn" class="w-fit absolute max-[550px]:relative -top-12.5 max-[550px]:top-0 flex justify-center items-center px-3 py-1 mb-2 max-[550px]:mb-0 max-[440px]:px-2 max-[440px]:py-0.5 border border-border rounded-full text-border font-bold text-sm max-[550px]:text-xs max-[440px]:text-[10px] transition-colors duration-200 ease-in-out cursor-pointer hover:border-white hover:text-white">
+      <svg class="fill-current size-4 max-[550px]:size-3 mr-0.5" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+      </svg>
+      Back
+    </button>
+  `;
+
+  const filters = `
+  <div class="flex flex-row gap-3 w-full mb-4">
+    <div class="relative flex-1">
+      <select id="muscle-filter" class="block w-full bg-surface border border-border text-white text-sm rounded-lg focus:ring-accent focus:border-accent p-2.5 appearance-none cursor-pointer">
+        <option value="">All Muscles</option>
+        ${(['chest', 'biceps', 'back', 'triceps', 'legs', 'abs', 'shoulders', 'forearms'] as MuscleGroup[])
+          .map((m) => `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`)
+          .join('')}
+      </select>
+      <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+        <svg class="fill-current h-4 w-4" viewBox="0 0 20 20">
+          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+        </svg>
+      </div>
+    </div>
+    <div class="relative flex-1">
+      <select id="workout-filter" class="block w-full bg-surface border border-border text-white text-sm rounded-lg focus:ring-accent focus:border-accent p-2.5 appearance-none cursor-pointer">
+        <option value="">All Workouts</option>
+        ${workoutDB
+          .map(
+            (w) =>
+              `<option value="${w.workout_id}">${w.name
+                .toLowerCase()
+                .split(' ')
+                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ')}</option>`,
+          )
+          .join('')}
+      </select>
+      <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+        <svg class="fill-current h-4 w-4" viewBox="0 0 20 20">
+          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+        </svg>
+      </div>
+    </div>
+  </div>
+`;
+
+  return `
+    <div class="flex flex-col w-full mt-3">
+      ${backButton}
+      ${filters}
+      <div id="dashboard-results">${renderDashboardCards(results)}</div>
+    </div>
+  `;
+}
+
+function renderDashboardCards(results: DashboardEntry[]): string {
+  if (results.length === 0) {
+    return `<p class="text-muted text-sm text-center">No exercises found.</p>`;
+  }
+
+  const grouped = results.reduce(
+    (acc, entry) => {
+      const muscle = entry.exercise.muscle;
+      if (!acc[muscle]) acc[muscle] = [];
+      acc[muscle].push(entry);
+      return acc;
+    },
+    {} as Record<MuscleGroup, DashboardEntry[]>,
+  );
+
+  return (Object.keys(grouped) as MuscleGroup[])
+    .map((muscle) => {
+      const cards = grouped[muscle]
+        .map((entry) => {
+          if (entry.type === 'insufficient') {
+            return `
+              <div class="flex flex-col justify-center gap-1.5 p-3 sm:px-4 sm:py-3 bg-surface border border-border rounded-xl">
+                <p class="font-bold text-sm max-[440px]:text-xs uppercase tracking-wider text-${muscle}">${entry.exercise.name}</p>
+                <div class="w-full border-t border-border pt-1.5 mt-1.5">
+                  <p class="text-xs max-[440px]:text-[10px] text-muted font-medium italic text-center">Not Enough Data to Analyse</p>
+                </div>
+              </div>
+            `;
+          }
+
+          const report = entry.data;
+
+          const scoreDiff = report.curr_perf[0] - report.prev_perf[0];
+          const scorePct = report.prev_perf[0] !== 0 ? ((scoreDiff / report.prev_perf[0]) * 100).toFixed(1) : '0.0';
+
+          const repsDiff = report.curr_perf[1] - report.prev_perf[1];
+          const repsPct = report.prev_perf[1] !== 0 ? ((repsDiff / report.prev_perf[1]) * 100).toFixed(1) : '0.0';
+
+          const pctColour = report.status === 'good' ? 'text-green-500' : 'text-red-500';
+          const pctPrefix = scoreDiff >= 0 ? '+' : '';
+
+          const getRecommendation = (report_code: number, status: string): string => {
+            if (report_code === -1) return 'Decrease Weight';
+            if (report_code === 1) return 'Increase Weight';
+            if (status === 'good') return 'Stable';
+            return 'Maintain Weight';
+          };
+
+          return `
+            <div class="flex flex-col gap-1.5 p-3 sm:px-4 sm:py-3 bg-surface border border-border rounded-xl">
+              <div class="flex flex-row justify-between items-center">
+                <p class="font-bold text-sm max-[440px]:text-xs uppercase tracking-wider text-${muscle}">${entry.exercise.name}</p>
+                <p class="text-xs max-[440px]:text-[10px] font-bold ${pctColour}">${pctPrefix}${scorePct}%</p>
+              </div>
+              <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-xs max-[440px]:text-[10px] border-t border-border pt-1.5 mt-1.5">
+                <div class="flex flex-col">
+                  <p class="text-muted uppercase tracking-wider font-semibold">Score</p>
+                  <p class="text-white">${report.prev_perf[0].toFixed(1)} → ${report.curr_perf[0].toFixed(1)}</p>
+                </div>
+                <div class="flex flex-col">
+                  <p class="text-muted uppercase tracking-wider font-semibold">Avg Reps</p>
+                  <p class="text-white">${report.prev_perf[1].toFixed(1)} → ${report.curr_perf[1].toFixed(1)} <span class="${pctColour}">(${repsDiff >= 0 ? '+' : ''}${repsPct}%)</span></p>
+                </div>
+              </div>
+              <div class="w-full border-t border-border pt-1.5 mt-1.5">
+                <p class="text-xs max-[440px]:text-[10px] text-muted">Recommendation: <span class="text-white font-semibold">${getRecommendation(report.report_code, report.status)}</span></p>
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+
+      return `
+        <div class="flex flex-col gap-3 w-full mb-3">
+          <p class="text-sm max-[440px]:text-xs font-bold uppercase tracking-wider text-${muscle} border-b border-border pb-1 mb-1">${muscle.charAt(0).toUpperCase() + muscle.slice(1)}</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+            ${cards}
+          </div>
+        </div>
+      `;
+    })
+    .join('');
 }
 
 function createLiveConfirmationMenu(): string {
   return `
     <div id="live-confirmation-container" class="flex flex-col items-center w-full">
-      
-      <h3 class="">Are you finished logging?</h3>
-      <p class="">Ensure all sets and weights are updated before running your live analysis.</p>
-
-      <div class="flex flex-row gap-3">
-        <button id="cancel-live-analysis-btn" class="">Go Back</button>
-        <button id="confirm-live-analysis-btn" class="">Run Analysis</button>
+      <p class="block text-lg max-[440px]:text-base font-bold text-muted uppercase tracking-wider mb-2">Are you finished logging?</p>
+      <p class="font-extralight text-center max-[440px]:text-sm">Ensure all sets and weights are updated before running your live analysis.</p>
+      <div class="flex flex-row gap-3 mt-3">
+        <button id="cancel-live-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out cursor-pointer">Back</button>
+        <button id="confirm-live-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out cursor-pointer">Analyse</button>
       </div>
-
     </div>
   `;
+}
+
+function renderLiveAnalysisResults(results: AnalysisReport[]): string {
+  const backButton = `
+    <button id="analysis-back-btn" class="w-fit absolute max-[550px]:relative -top-12.5 max-[550px]:top-0 flex justify-center items-center px-3 py-1 mb-2 max-[550px]:mb-0 max-[440px]:px-2 max-[440px]:py-0.5 border border-border rounded-full text-border font-bold text-sm max-[550px]:text-xs max-[440px]:text-[10px] transition-colors duration-200 ease-in-out cursor-pointer hover:border-white hover:text-white">
+      <svg class="fill-current size-4 max-[550px]:size-3 mr-0.5" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+      </svg>
+      Back
+    </button>
+  `;
+
+  const cards = results
+    .map((report) => {
+      const exercise = exerciseDB.find((e) => e.exercise_id === report.exercise_id);
+      const muscleColour = exercise ? `text-${exercise.muscle}` : 'text-white';
+
+      const scoreDiff = report.curr_perf[0] - report.prev_perf[0];
+      const scorePct = report.prev_perf[0] !== 0 ? ((scoreDiff / report.prev_perf[0]) * 100).toFixed(1) : '0.0';
+
+      const repsDiff = report.curr_perf[1] - report.prev_perf[1];
+      const repsPct = report.prev_perf[1] !== 0 ? ((repsDiff / report.prev_perf[1]) * 100).toFixed(1) : '0.0';
+
+      const pctColour = report.status === 'good' ? 'text-green-500' : 'text-red-500';
+      const pctPrefix = scoreDiff >= 0 ? '+' : '';
+
+      const getRecommendation = (report_code: number, status: string): string => {
+        if (report_code === -1) return 'Decrease Weight';
+        if (report_code === 1) return 'Increase Weight';
+        if (report_code === 0 && status === 'good') return 'Stable';
+        return 'Maintain Weight, Push for Reps';
+      };
+
+      return `
+        <div class="w-full flex flex-col gap-1 px-4 py-3 bg-surface border border-border rounded-xl">
+          <div class="flex flex-row justify-between items-center">
+            <p class="font-bold text-sm max-[440px]:text-xs uppercase tracking-wider ${muscleColour}">${exercise?.name ?? 'Unknown Exercise'}</p>
+            <p class="text-xs max-[440px]:text-[10px] font-semibold ${pctColour}">${pctPrefix}${scorePct}%</p>
+          </div>
+          <div class="w-full h-px bg-border my-1"></div>
+          <div class="grid grid-cols-2 gap-2 text-xs max-[440px]:text-[10px]">
+            <div class="flex flex-col gap-0.5">
+              <p class="text-muted uppercase tracking-wider font-semibold">Score</p>
+              <p class="text-white">${report.prev_perf[0]} → ${report.curr_perf[0]}</p>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <p class="text-muted uppercase tracking-wider font-semibold">Avg Reps</p>
+              <p class="text-white">${report.prev_perf[1]} → ${report.curr_perf[1]} <span class="${pctColour}">(${repsDiff >= 0 ? '+' : ''}${repsPct}%)</span></p>
+            </div>
+          </div>
+          <div class="w-full h-px bg-border my-1"></div>
+          <p class="text-xs max-[440px]:text-[10px] text-muted">Recommendation: <span class="text-white font-semibold">${getRecommendation(report.report_code, report.status)}</span></p>
+        </div>
+      `;
+    })
+    .join('');
+
+  return `<div class="relative flex flex-col gap-5 w-full mt-3 max-[550px]:mt-0">${backButton}${cards}</div>`;
 }
 
 function createLogHeader(): string {
@@ -881,6 +1177,7 @@ function setActionButtons(workoutId: number, container: HTMLDivElement) {
   saveButtonRow.innerHTML = `
     <button id="save-workout-btn" class="bg-surface border border-accent text-accent font-bold max-[550px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Save Workout</button>
     <button id="export-workout-btn" class="bg-surface border border-accent text-accent font-bold max-[550px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Export Data</button>
+    <button id="import-workout-btn" class="bg-surface border border-accent text-accent font-bold max-[550px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Import Data</button>
   `;
   container.appendChild(saveButtonRow);
 
@@ -919,6 +1216,10 @@ function setActionButtons(workoutId: number, container: HTMLDivElement) {
     setButtonLoadingState(button, 'Exporting...');
     await exportWorkoutData();
     setButtonSuccessState(button, 'Exported!', 'Export Data');
+  });
+
+  document.querySelector('#import-workout-btn')?.addEventListener('click', (e) => {
+    triggerImport(e.target as HTMLButtonElement);
   });
 }
 
@@ -1098,4 +1399,44 @@ export async function exportWorkoutData() {
     console.error('Error exporting file:', err);
     alert(`Failed to export backup: ${err.message}`);
   }
+}
+
+export async function importWorkoutData(file: File): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      try {
+        const raw = e.target?.result as string;
+        const data = JSON.parse(raw);
+
+        if (!data.sessions || !data.instances || !data.exercises || !data.workouts) {
+          throw new Error('Invalid backup file structure.');
+        }
+
+        mySessions = data.sessions;
+        myExerciseInstances = data.instances;
+        exerciseDB = data.exercises;
+        workoutDB = data.workouts;
+
+        if (exerciseDB.length > 0) {
+          const maxId = Math.max(...exerciseDB.map((e) => e.exercise_id));
+          globalExerciseIdCounter = maxId + 1;
+        } else {
+          globalExerciseIdCounter = 1;
+        }
+
+        fullExercisePerformance = {};
+        catchExerciseData();
+
+        await saveWorkoutData();
+        resolve();
+      } catch (err: any) {
+        reject(new Error(err.message || 'Failed to parse import file.'));
+      }
+    };
+
+    reader.onerror = () => reject(new Error('File could not be read.'));
+    reader.readAsText(file);
+  });
 }
