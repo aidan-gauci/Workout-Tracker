@@ -49,16 +49,6 @@
     </header>
 
     <main>
-      <section class="max-w-275 mx-auto bg-surface border border-border px-5 py-3 mb-5">
-        <p class="inline-block border-b border-border text-xl font-bold tracking-widest text-accent uppercase pb-2 mb-2">Muscle Gap Analysis</p>
-        <ul class="list-none">
-          <li>
-            <strong class="block text-sm font-semibold text-text mb-0.5">Upper Chest</strong>
-            <p class="text-xs text-muted leading-relaxed">Lacking volume compared to lower chest.</p>
-          </li>
-        </ul>
-      </section>
-
       <section class="max-w-275 mx-auto grid grid-cols-1 min-[780px]:grid-cols-2 min-[1140px]:grid-cols-3 gap-5 mb-5">
         <article class="bg-surface border border-border">
           <div class="border-b border-border flex items-start gap-3 p-5">
@@ -350,6 +340,24 @@
             </ul>
           </div>
         </article>
+      </section>
+
+      <section class="max-w-275 mx-auto bg-surface border border-border px-5 py-6 mb-5">
+        <p class="block w-fit mx-auto border-b border-border text-xl font-bold tracking-widest text-accent uppercase pb-2 mb-2">Workout Analysis</p>
+        <div id="workout-analysis-container" class="flex flex-row justify-center gap-[7.5%] p-4">
+          <button
+            id="live-analysis-btn"
+            class="w-56 max-[600px]:w-32 border border-border rounded-lg text-xl max-[600px]:text-lg max-[440px]:text-base font-bold text-text p-4 cursor-pointer hover:scale-105 transition-all duration-200 ease-in-out"
+          >
+            By Live Workout
+          </button>
+          <button
+            id="preset-analysis-btn"
+            class="w-56 max-[600px]:w-32 border border-border rounded-lg text-xl max-[600px]:text-lg max-[440px]:text-base font-bold text-text p-4 cursor-pointer hover:scale-105 transition-all duration-200 ease-in-out"
+          >
+            By Preset Workout
+          </button>
+        </div>
       </section>
 
       <section class="max-w-275 mx-auto bg-surface border border-border px-5 py-6">
