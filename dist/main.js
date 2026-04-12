@@ -92,8 +92,8 @@ function setupGlobalEventListeners() {
 }
 function handleAnalysisClicks(event) {
     const target = event.target;
-    if (target.closest('#preset-analysis-btn'))
-        initiatePresetAnalysis(target);
+    if (target.closest('#global-analysis-btn'))
+        initiateGlobalAnalysis(target);
     if (target.closest('#live-analysis-btn'))
         initiateLiveAnalysis(target);
 }
@@ -149,7 +149,7 @@ function updateActiveStateData(exerciseId, setNum, target) {
         set.weight = parseFloat(target.value) || 0;
     }
 }
-function initiatePresetAnalysis(btn) {
+function initiateGlobalAnalysis(btn) {
     var _a;
     if (workoutDB.length === 0) {
         return showInlineWarning(btn, 'No Workouts Found');
@@ -166,25 +166,46 @@ function initiatePresetAnalysis(btn) {
     setupDashboardFilters(analysisContainer);
 }
 function setupDashboardFilters(container) {
-    var _a, _b;
+    var _a;
     let activeMuscle = undefined;
-    let activeWorkout = undefined;
+    let badOnly = false;
+    const setupToggleListeners = () => {
+        container.querySelectorAll('.muscle-group-header').forEach((header) => {
+            header.addEventListener('click', () => {
+                const section = header.closest('.flex.flex-col');
+                const cards = section.querySelector('.muscle-group-cards');
+                const icon = header.querySelector('svg');
+                cards.classList.toggle('hidden');
+                icon.classList.toggle('rotate-180');
+                icon.classList.toggle('rotate-0');
+            });
+        });
+    };
     const rerender = () => {
-        const results = catchDashboardAnalysis(activeMuscle, activeWorkout);
+        let results = catchDashboardAnalysis(activeMuscle);
+        if (badOnly) {
+            results = results.filter((e) => e.type === 'insufficient' || e.data.status === 'bad');
+        }
         const resultsContainer = container.querySelector('#dashboard-results');
         if (resultsContainer)
             resultsContainer.innerHTML = renderDashboardCards(results);
+        setupToggleListeners();
     };
     (_a = container.querySelector('#muscle-filter')) === null || _a === void 0 ? void 0 : _a.addEventListener('change', (e) => {
         const val = e.target.value;
         activeMuscle = val ? val : undefined;
         rerender();
     });
-    (_b = container.querySelector('#workout-filter')) === null || _b === void 0 ? void 0 : _b.addEventListener('change', (e) => {
-        const val = e.target.value;
-        activeWorkout = val ? parseInt(val) : undefined;
+    const toggleBtn = container.querySelector('#bad-only-toggle');
+    toggleBtn === null || toggleBtn === void 0 ? void 0 : toggleBtn.addEventListener('click', () => {
+        badOnly = !badOnly;
+        toggleBtn.classList.toggle('border-red-500', badOnly);
+        toggleBtn.classList.toggle('text-red-500', badOnly);
+        toggleBtn.classList.toggle('border-border', !badOnly);
+        toggleBtn.classList.toggle('text-border', !badOnly);
         rerender();
     });
+    setupToggleListeners();
 }
 function initiateLiveAnalysis(btn) {
     const hasData = activeWorkoutState.length > 0;
@@ -367,8 +388,8 @@ function openNewExerciseForm(btn, workoutId) {
       <input id="new-ex-max" type="number" placeholder="Max reps" min="1" class="w-full bg-transparent border border-border text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
     </div>
     <div class="flex gap-2">
-      <button id="new-ex-cancel" class="w-full border border-border text-border text-sm rounded-lg py-2 cursor-pointer">Cancel</button>
-      <button id="new-ex-confirm" class="w-full border border-accent text-accent text-sm rounded-lg py-2 cursor-pointer">Add</button>
+      <button id="new-ex-cancel" class="w-full border border-border text-border text-sm rounded-lg py-2 transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">Cancel</button>
+      <button id="new-ex-confirm" class="w-full border border-accent text-accent text-sm rounded-lg py-2 transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">Add</button>
     </div>
   `;
     btn.insertAdjacentElement('afterend', form);
@@ -638,46 +659,21 @@ function returnToAnalysisMenu() {
     return `
     <button
       id="live-analysis-btn"
-      class="w-56 max-[600px]:w-32 border border-border rounded-lg text-xl max-[600px]:text-lg max-[440px]:text-base font-bold text-text p-4 cursor-pointer hover:scale-105 transition-all duration-200 ease-in-out"
+      class="w-56 max-[600px]:w-32 border border-border rounded-lg text-xl max-[600px]:text-lg max-[440px]:text-base font-bold text-text p-4 cursor-pointer hover:scale-105 transition-all duration-200 ease-in-out hover:border-white hover:text-white"
     >
       By Live Workout
     </button>
     <button
-      id="preset-analysis-btn"
-      class="w-56 max-[600px]:w-32 border border-border rounded-lg text-xl max-[600px]:text-lg max-[440px]:text-base font-bold text-text p-4 cursor-pointer hover:scale-105 transition-all duration-200 ease-in-out"
+      id="global-analysis-btn"
+      class="w-56 max-[600px]:w-32 border border-border rounded-lg text-xl max-[600px]:text-lg max-[440px]:text-base font-bold text-text p-4 cursor-pointer hover:scale-105 transition-all duration-200 ease-in-out hover:border-white hover:text-white"
     >
-      By Preset Workout
+      By Global Workout
     </button>
-  `;
-}
-function createWorkoutSelectionMenu() {
-    return `
-    <label for="preset-analysis-dropdown" class="block text-lg max-[440px]:text-base font-bold text-muted uppercase tracking-wider mb-2">Select a Preset to Analyse</label>
-    <div class="relative">
-      <select id="preset-analysis-dropdown" class="block w-full bg-surface border border-border text-white text-sm rounded-lg focus:ring-orange-600 focus:border-orange-600 p-2.5 appearance-none cursor-pointer">
-        <option selected disabled class="text-center">Choose a Day</option>
-        <option value="day-1">1. Chest & Biceps</option>
-        <option value="day-2">2. Back & Triceps</option>
-        <option value="day-3">3. Legs & Abs</option>
-        <option value="day-4">4. Shoulders & Arms</option>
-        <option value="day-5">5. Chest & Back</option>
-        <option value="day-6">6. Legs & Abs</option>
-      </select>
-      <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-        <svg class="fill-current h-4 w-4" viewBox="0 0 20 20">
-          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-        </svg>
-      </div>
-    </div>
-    <div class="flex flex-row gap-3 mt-3">
-      <button id="cancel-preset-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out cursor-pointer">Back</button>
-      <button id="confirm-preset-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out cursor-pointer">Analyse</button>
-    </div>
   `;
 }
 function renderDashboardResults(results) {
     const backButton = `
-    <button id="analysis-back-btn" class="w-fit absolute max-[550px]:relative -top-12.5 max-[550px]:top-0 flex justify-center items-center px-3 py-1 mb-2 max-[550px]:mb-0 max-[440px]:px-2 max-[440px]:py-0.5 border border-border rounded-full text-border font-bold text-sm max-[550px]:text-xs max-[440px]:text-[10px] transition-colors duration-200 ease-in-out cursor-pointer hover:border-white hover:text-white">
+    <button id="analysis-back-btn" class="w-fit relative -top-12.5 max-[550px]:top-0 flex justify-center items-center px-3 py-1 mb-2 max-[440px]:px-2 max-[440px]:py-0.5 border border-border rounded-full text-border font-bold text-sm max-[550px]:text-xs max-[440px]:text-[10px] transition-colors duration-200 ease-in-out cursor-pointer hover:border-white hover:text-white">
       <svg class="fill-current size-4 max-[550px]:size-3 mr-0.5" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
       </svg>
@@ -685,41 +681,27 @@ function renderDashboardResults(results) {
     </button>
   `;
     const filters = `
-  <div class="flex flex-row gap-3 w-full mb-4">
-    <div class="relative flex-1">
-      <select id="muscle-filter" class="block w-full bg-surface border border-border text-white text-sm rounded-lg focus:ring-accent focus:border-accent p-2.5 appearance-none cursor-pointer">
-        <option value="">All Muscles</option>
-        ${['chest', 'biceps', 'back', 'triceps', 'legs', 'abs', 'shoulders', 'forearms']
+    <div class="flex flex-row gap-3 w-full mb-4">
+      <div class="relative flex-1">
+        <select id="muscle-filter" class="block w-full bg-surface border border-border text-white text-sm rounded-lg focus:ring-accent focus:border-accent p-2.5 appearance-none cursor-pointer">
+          <option value="">All Muscles</option>
+          ${['chest', 'biceps', 'back', 'triceps', 'legs', 'abs', 'shoulders', 'forearms']
         .map((m) => `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`)
         .join('')}
-      </select>
-      <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-        <svg class="fill-current h-4 w-4" viewBox="0 0 20 20">
-          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-        </svg>
+        </select>
+        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
+          <svg class="fill-current h-4 w-4" viewBox="0 0 20 20">
+            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+          </svg>
+        </div>
       </div>
+      <button id="bad-only-toggle" class="flex-1 flex justify-center items-center px-3 py-2.5 bg-surface border border-border rounded-lg text-border font-bold text-sm max-[550px]:text-xs transition-colors duration-200 ease-in-out cursor-pointer">
+        Needs Work Only
+      </button>
     </div>
-    <div class="relative flex-1">
-      <select id="workout-filter" class="block w-full bg-surface border border-border text-white text-sm rounded-lg focus:ring-accent focus:border-accent p-2.5 appearance-none cursor-pointer">
-        <option value="">All Workouts</option>
-        ${workoutDB
-        .map((w) => `<option value="${w.workout_id}">${w.name
-        .toLowerCase()
-        .split(' ')
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ')}</option>`)
-        .join('')}
-      </select>
-      <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-        <svg class="fill-current h-4 w-4" viewBox="0 0 20 20">
-          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-        </svg>
-      </div>
-    </div>
-  </div>
-`;
+  `;
     return `
-    <div class="flex flex-col w-full mt-3">
+    <div class="flex flex-col w-full mt-3 max-[550px]:mt-0">
       ${backButton}
       ${filters}
       <div id="dashboard-results">${renderDashboardCards(results)}</div>
@@ -763,9 +745,9 @@ function renderDashboardCards(results) {
                     return 'Decrease Weight';
                 if (report_code === 1)
                     return 'Increase Weight';
-                if (status === 'good')
+                if (report_code === 0 && status === 'good')
                     return 'Stable';
-                return 'Maintain Weight';
+                return 'Maintain Weight, Push for Reps';
             };
             return `
             <div class="flex flex-col gap-1.5 p-3 sm:px-4 sm:py-3 bg-surface border border-border rounded-xl">
@@ -792,8 +774,15 @@ function renderDashboardCards(results) {
             .join('');
         return `
         <div class="flex flex-col gap-3 w-full mb-3">
-          <p class="text-sm max-[440px]:text-xs font-bold uppercase tracking-wider text-${muscle} border-b border-border pb-1 mb-1">${muscle.charAt(0).toUpperCase() + muscle.slice(1)}</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+          <div class="flex flex-row justify-between items-center border-b border-border pb-1 mb-1 cursor-pointer muscle-group-header">
+            <p class="text-sm max-[440px]:text-xs font-bold uppercase tracking-wider text-${muscle}">${muscle.charAt(0).toUpperCase() + muscle.slice(1)}</p>
+            <button class="muscle-group-toggle w-fit flex justify-center items-center p-1 max-[440px]:p-0.5 border border-border rounded-full text-border transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer rotate-180">
+              <svg class="fill-current size-5 max-[550px]:size-4 max-[440px]:size-3 transition-transform duration-200 ease-in-out" viewBox="0 0 20 20">
+                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+              </svg>
+            </button>
+          </div>
+          <div class="muscle-group-cards grid grid-cols-1 sm:grid-cols-2 gap-3 w-full hidden">
             ${cards}
           </div>
         </div>
@@ -807,8 +796,8 @@ function createLiveConfirmationMenu() {
       <p class="block text-lg max-[440px]:text-base font-bold text-muted uppercase tracking-wider mb-2">Are you finished logging?</p>
       <p class="font-extralight text-center max-[440px]:text-sm">Ensure all sets and weights are updated before running your live analysis.</p>
       <div class="flex flex-row gap-3 mt-3">
-        <button id="cancel-live-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out cursor-pointer">Back</button>
-        <button id="confirm-live-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out cursor-pointer">Analyse</button>
+        <button id="cancel-live-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">Back</button>
+        <button id="confirm-live-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">Analyse</button>
       </div>
     </div>
   `;
@@ -883,15 +872,15 @@ function createExerciseRow(exercise) {
     row.dataset.exerciseId = exercise.exercise_id.toString();
     row.innerHTML = `
     <div class="flex flex-row gap-4 ml-2 max-[440px]:gap-2 max-[440px]:ml-1 items-center">
-      <button class="delete-exercise-btn w-fit relative transition-colors duration-200 ease-in-out flex justify-center items-center p-1 max-[440px]:p-0.5 border border-border rounded-full text-border cursor-pointer">
+      <button class="delete-exercise-btn w-fit relative transition-colors duration-200 ease-in-out flex justify-center items-center p-1 max-[440px]:p-0.5 border border-border rounded-full text-border cursor-pointer hover:border-white hover:text-white">
         <svg class="fill-current size-5 max-[550px]:size-4 max-[440px]:size-3" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
         </svg>
       </button>
       <p class="max-[550px]:text-sm max-[440px]:text-xs font-medium ${'text-' + exercise.muscle} pr-2">${exercise.name}</p>
     </div>
-    <button class="option-dropdown w-fit flex justify-center items-center p-1 max-[440px]:p-0.5 mx-auto max:[440px]:m-0 border border-border rounded-full text-border cursor-pointer rotate-0">
-      <svg class="fill-current size-5 max-[550px]:size-4 max-[440px]:size-3" viewBox="0 0 20 20">
+    <button class="option-dropdown w-fit flex justify-center items-center p-1 max-[440px]:p-0.5 mx-auto max:[440px]:m-0 border border-border rounded-full text-border cursor-pointer rotate-180 transition-colors duration-200 ease-in-out hover:border-white hover:text-white">
+      <svg class="fill-current size-5 max-[550px]:size-4 max-[440px]:size-3 transition-transform duration-200 ease-in-out" viewBox="0 0 20 20">
         <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
       </svg>
     </button>
@@ -912,13 +901,13 @@ function createExerciseRow(exercise) {
     }
     const editSets = `
     <div class="w-full relative -top-2 max-[550px]:-top-1 max-[550px]:mb-1 mx-auto flex flex-row justify-center gap-2" style="grid-column: 1 / -1">
-      <button class="add-set w-fit relative flex justify-center items-center my-auto px-3 py-1 max-[440px]:px-2 max-[440px]:py-0.5 border border-border rounded-full text-border font-bold text-sm max-[550px]:text-xs max-[440px]:text-[10px] transition-colors duration-200 ease-in-out cursor-pointer">
+      <button class="add-set w-fit relative flex justify-center items-center my-auto px-3 py-1 max-[440px]:px-2 max-[440px]:py-0.5 border border-border rounded-full text-border font-bold text-sm max-[550px]:text-xs max-[440px]:text-[10px] transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">
         Add Set
         <svg class="fill-current size-5 max-[550px]:size-4 ml-0.5" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M10 4a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 0110 4z" clip-rule="evenodd" />
         </svg>
       </button>
-      <button class="del-set w-fit relative flex justify-center items-center my-auto px-3 py-1 max-[440px]:px-2 max-[440px]:py-0.5 border border-border rounded-full text-border font-bold text-sm max-[550px]:text-xs max-[440px]:text-[10px] transition-colors duration-200 ease-in-out cursor-pointer">
+      <button class="del-set w-fit relative flex justify-center items-center my-auto px-3 py-1 max-[440px]:px-2 max-[440px]:py-0.5 border border-border rounded-full text-border font-bold text-sm max-[550px]:text-xs max-[440px]:text-[10px] transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">
         Del Set
         <svg class="fill-current size-4 ml-0.5 p-0.5" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
@@ -933,7 +922,7 @@ function createExerciseRow(exercise) {
 function createNewExercise() {
     return `
     <div class="w-full relative max-[550px]:top-2 mx-auto border-b border-border" style="grid-column: 1 / -1">
-      <button id="add-exercise-btn" class="w-fit relative flex justify-center items-center mx-auto mb-2 px-4 py-2 max-[440px]:px-2.5 max-[440px]:py-1 border border-border rounded-full text-border font-bold max-[550px]:text-sm max-[440px]:text-xs cursor-pointer">
+      <button id="add-exercise-btn" class="w-fit relative flex justify-center items-center mx-auto mb-2 px-4 py-2 max-[440px]:px-2.5 max-[440px]:py-1 border border-border rounded-full text-border font-bold max-[550px]:text-sm max-[440px]:text-xs transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">
         Add Exercise
         <svg class="fill-current size-5 max-[550px]:size-4 ml-0.5" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M10 4a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 0110 4z" clip-rule="evenodd" />
@@ -964,15 +953,16 @@ function createNewSet(i) {
 }
 function setActionButtons(workoutId, container) {
     var _a, _b, _c;
-    container.insertAdjacentHTML('beforeend', createNewExercise());
-    const saveButtonRow = document.createElement('div');
-    saveButtonRow.className = 'mt-5 flex flex-row justify-center gap-3';
-    saveButtonRow.innerHTML = `
-    <button id="save-workout-btn" class="bg-surface border border-accent text-accent font-bold max-[550px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Save Workout</button>
-    <button id="export-workout-btn" class="bg-surface border border-accent text-accent font-bold max-[550px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Export Data</button>
-    <button id="import-workout-btn" class="bg-surface border border-accent text-accent font-bold max-[550px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">Import Data</button>
+    const actionButtonRow = container.querySelector('#action-button-row');
+    if (actionButtonRow) {
+        actionButtonRow.insertAdjacentHTML('beforebegin', createNewExercise());
+    }
+    const saveButton = `
+    <button id="save-workout-btn" class="w-46 max-[620px]:w-33 max-[440px]:w-19 bg-surface border border-accent text-accent font-bold max-[620px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 max-[440px]:px-2.5 py-2 rounded-xl hover:scale-105 transition-all duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">Save Workout</button>
   `;
-    container.appendChild(saveButtonRow);
+    if (actionButtonRow) {
+        actionButtonRow.insertAdjacentHTML('afterbegin', saveButton);
+    }
     let activeSessionId = null;
     (_a = document.querySelector('#save-workout-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
         const button = e.target;
@@ -1027,13 +1017,18 @@ function renderWorkoutLogForm(workout) {
     const daySelectionContainer = document.querySelector('#log-selection-container');
     if (!workoutLogContainer || !daySelectionContainer)
         return;
-    daySelectionContainer.classList.add('border-b', 'border-border', 'pb-4', 'mb-4');
-    workoutLogContainer.innerHTML = createLogHeader();
+    daySelectionContainer.classList.add('mb-4');
+    const actionButtonRow = workoutLogContainer.querySelector('#action-button-row');
+    if (actionButtonRow) {
+        actionButtonRow.insertAdjacentHTML('beforebegin', createLogHeader());
+    }
     const joinedExercises = buildJoinedExercises(workout);
     initActiveState(joinedExercises);
     joinedExercises.forEach((exercise) => {
         const rowElement = createExerciseRow(exercise);
-        workoutLogContainer.appendChild(rowElement);
+        if (actionButtonRow) {
+            actionButtonRow.insertAdjacentElement('beforebegin', rowElement);
+        }
     });
     setActionButtons(workout.workout_id, workoutLogContainer);
 }
