@@ -128,9 +128,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setupGlobalEventListeners() {
-  const workoutAnalysisContainer = document.getElementById('workout-analysis-container') as HTMLDivElement;
-  const gymDaysDropdown = document.getElementById('gym-days') as HTMLSelectElement;
-  const workoutLogContainer = document.getElementById('workout-log-container') as HTMLDivElement;
+  const workoutAnalysisContainer = document.querySelector('#workout-analysis-container') as HTMLDivElement;
+  const gymDaysDropdown = document.querySelector('#gym-days') as HTMLSelectElement;
+  const workoutLogContainer = document.querySelector('#workout-log-container') as HTMLDivElement;
 
   if (workoutAnalysisContainer) {
     workoutAnalysisContainer.addEventListener('click', handleAnalysisClicks);
@@ -185,8 +185,11 @@ function handleWorkoutClicks(event: Event) {
   const dropdownBtn = target.closest('.option-dropdown') as HTMLButtonElement | null;
   if (dropdownBtn) return toggleSetDropdown(dropdownBtn);
 
-  const deleteBtn = target.closest('.exercise-delete') as HTMLButtonElement | null;
-  if (deleteBtn) return removeExercise(deleteBtn);
+  const delExerciseBtn = target.closest('.delete-exercise-btn') as HTMLButtonElement | null;
+  if (delExerciseBtn) return removeExerciseFromSession(delExerciseBtn);
+
+  const addExerciseBtn = target.closest('#add-exercise-btn') as HTMLButtonElement | null;
+  if (addExerciseBtn) return toggleAddExerciseDropdown(addExerciseBtn);
 
   const delSetBtn = target.closest('.del-set') as HTMLButtonElement | null;
   if (delSetBtn) return removeSet(delSetBtn);
@@ -216,7 +219,7 @@ function initiatePresetAnalysis(btn: HTMLButtonElement) {
     return showInlineWarning(btn, 'No Workouts Found');
   }
 
-  const analysisContainer = document.getElementById('workout-analysis-container');
+  const analysisContainer = document.querySelector('#workout-analysis-container');
 
   if (analysisContainer) {
     analysisContainer.classList = 'flex flex-col items-center w-full';
@@ -225,13 +228,13 @@ function initiatePresetAnalysis(btn: HTMLButtonElement) {
 }
 
 function initiateLiveAnalysis(btn: HTMLButtonElement) {
-  const hasData = activeWorkoutState.some((ex) => ex.sets.some((s) => s.reps > 0));
+  const hasData = activeWorkoutState.length > 0;
 
   if (!hasData) {
-    return showInlineWarning(btn, 'Log a set first!');
+    return showInlineWarning(btn, 'Select a Workout First!');
   }
 
-  const analysisContainer = document.getElementById('workout-analysis-container');
+  const analysisContainer = document.querySelector('#workout-analysis-container');
   if (analysisContainer) {
     analysisContainer.classList = 'flex flex-col items-center w-full';
     analysisContainer.innerHTML = createLiveConfirmationMenu();
@@ -250,7 +253,7 @@ function toggleSetDropdown(btn: HTMLButtonElement) {
   }
 }
 
-function removeExercise(btn: HTMLButtonElement) {
+function removeExerciseFromSession(btn: HTMLButtonElement) {
   const row = btn.closest('.workout-log-entry') as HTMLElement;
   const exerciseId = parseInt(row.getAttribute('data-exercise-id') || '0', 10);
 
@@ -260,6 +263,174 @@ function removeExercise(btn: HTMLButtonElement) {
   } else {
     showTooltipWarning(btn, 'Need 1 Exercise!');
   }
+}
+
+function addNewExercise(name: string, muscle: MuscleGroup, workoutId: number, minReps: number, maxReps: number): Exercise {
+  const normalisedName = name.trim();
+
+  const existing = exerciseDB.find((e) => e.name.toLowerCase() === normalisedName.toLowerCase());
+  if (existing) return existing;
+
+  const newExercise: Exercise = {
+    exercise_id: globalExerciseIdCounter++,
+    name: normalisedName,
+    muscle,
+  };
+
+  exerciseDB.push(newExercise);
+
+  const workout = workoutDB.find((w) => w.workout_id === workoutId);
+  workout?.exercises.push({
+    exercise_id: newExercise.exercise_id,
+    set_num: 3,
+    reps: { min_reps: minReps, max_reps: maxReps },
+  });
+
+  saveWorkoutData().catch((e) => console.error('Save after new exercise failed', e));
+  return newExercise;
+}
+
+function addExerciseToSession(exercise: Exercise, workoutId: number) {
+  const workoutExercise = workoutDB.flatMap((w) => w.exercises).find((e) => e.exercise_id === exercise.exercise_id);
+
+  const setNum = workoutExercise?.set_num ?? 3;
+  const minReps = workoutExercise?.reps.min_reps ?? 8;
+  const maxReps = workoutExercise?.reps.max_reps ?? 12;
+
+  activeWorkoutState.push({
+    exercise_id: exercise.exercise_id,
+    sets: Array.from({ length: setNum }, (_, i) => ({ num: i + 1, reps: 0, weight: 0 })),
+  });
+
+  const workoutLogContainer = document.querySelector('#workout-log-container') as HTMLDivElement;
+  const rowElement = createExerciseRow({
+    ...exercise,
+    set_num: setNum,
+    reps: { min_reps: minReps, max_reps: maxReps },
+  });
+
+  const addExerciseRow = workoutLogContainer.querySelector('#add-exercise-btn')?.closest('div');
+
+  if (addExerciseRow) {
+    workoutLogContainer.insertBefore(rowElement, addExerciseRow);
+  } else {
+    workoutLogContainer.appendChild(rowElement);
+  }
+}
+
+function toggleAddExerciseDropdown(btn: HTMLButtonElement) {
+  const existingDropdown = document.querySelector('#add-exercise-dropdown');
+
+  if (existingDropdown) {
+    existingDropdown.remove();
+    return;
+  }
+
+  const currentWorkoutId = parseInt((document.querySelector('#gym-days') as HTMLSelectElement).value.replace('day-', ''));
+  const currentMuscles = workoutDB.find((w) => w.workout_id === currentWorkoutId)?.exercises.map((e) => exerciseDB.find((ex) => ex.exercise_id === e.exercise_id)?.muscle) ?? [];
+  const loggedIds = activeWorkoutState.map((e) => e.exercise_id);
+
+  const available = exerciseDB
+    .filter((e) => !e.is_deleted && !loggedIds.includes(e.exercise_id))
+    .sort((a, b) => {
+      const aRelevant = currentMuscles.includes(a.muscle) ? 0 : 1;
+      const bRelevant = currentMuscles.includes(b.muscle) ? 0 : 1;
+      return aRelevant - bRelevant;
+    });
+
+  const dropdown = document.createElement('div');
+  dropdown.id = 'add-exercise-dropdown';
+  dropdown.className = 'flex flex-col w-full bg-surface border border-border mb-2 rounded-lg overflow-hidden';
+
+  dropdown.innerHTML = `
+    <input 
+      id="exercise-search-input"
+      type="text" 
+      placeholder="Search Exercises..." 
+      class="w-full bg-transparent border-b border-border text-white max-[550px]:text-sm max-[440px]:text-xs px-3 py-2 focus:outline-none focus:border-accent"
+    />
+    <ul id="exercise-option-list" class="flex flex-col max-h-24 max-[550px]:max-h-16 overflow-y-scroll [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-neutral-600">
+      ${available
+        .map(
+          (e) => `
+        <li 
+          class="exercise-option px-3 py-2 text-sm max-[550px]:text-xs max-[440px]:text-[10px] text-${'text-' + e.muscle} cursor-pointer hover:bg-border transition-colors duration-150"
+          data-exercise-id="${e.exercise_id}"
+        >
+          ${e.name}
+        </li>
+      `,
+        )
+        .join('')}
+      <li id="add-new-exercise-option" class="px-3 py-2 text-sm max-[550px]:text-xs max-[440px]:text-[10px] text-muted cursor-pointer hover:bg-border transition-colors duration-150 border-t border-border">
+        + Add New Exercise
+      </li>
+    </ul>
+  `;
+
+  btn.insertAdjacentElement('afterend', dropdown);
+
+  dropdown.querySelector('#exercise-search-input')?.addEventListener('input', (e) => {
+    const query = (e.target as HTMLInputElement).value.toLowerCase().trim();
+    const options = dropdown.querySelectorAll('.exercise-option') as NodeListOf<HTMLElement>;
+    options.forEach((opt) => {
+      opt.style.display = opt.textContent?.toLowerCase().includes(query) ? '' : 'none';
+    });
+  });
+
+  dropdown.querySelectorAll('.exercise-option').forEach((opt) => {
+    opt.addEventListener('click', () => {
+      const id = parseInt((opt as HTMLElement).dataset.exerciseId || '0');
+      const exercise = exerciseDB.find((e) => e.exercise_id === id);
+      if (exercise) addExerciseToSession(exercise, currentWorkoutId);
+      dropdown.remove();
+    });
+  });
+
+  dropdown.querySelector('#add-new-exercise-option')?.addEventListener('click', () => {
+    dropdown.remove();
+    openNewExerciseForm(btn, currentWorkoutId);
+  });
+}
+
+function openNewExerciseForm(btn: HTMLButtonElement, workoutId: number) {
+  const form = document.createElement('div');
+  form.id = 'new-exercise-form';
+  form.className = 'flex flex-col gap-2 w-full bg-surface border border-border rounded-lg p-3 mb-2';
+
+  form.innerHTML = `
+    <input id="new-ex-name" type="text" placeholder="Exercise name" class="w-full bg-transparent border border-border text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
+    <select id="new-ex-muscle" class="w-full bg-surface border border-border text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-accent">
+      ${(['chest', 'biceps', 'back', 'triceps', 'legs', 'abs', 'shoulders', 'forearms'] as MuscleGroup[])
+        .map((m) => `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`)
+        .join('')}
+    </select>
+    <div class="flex gap-2">
+      <input id="new-ex-min" type="number" placeholder="Min reps" min="1" class="w-full bg-transparent border border-border text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
+      <input id="new-ex-max" type="number" placeholder="Max reps" min="1" class="w-full bg-transparent border border-border text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
+    </div>
+    <div class="flex gap-2">
+      <button id="new-ex-cancel" class="w-full border border-border text-border text-sm rounded-lg py-2 cursor-pointer">Cancel</button>
+      <button id="new-ex-confirm" class="w-full border border-accent text-accent text-sm rounded-lg py-2 cursor-pointer">Add</button>
+    </div>
+  `;
+
+  btn.insertAdjacentElement('afterend', form);
+
+  form.querySelector('#new-ex-cancel')?.addEventListener('click', () => form.remove());
+
+  form.querySelector('#new-ex-confirm')?.addEventListener('click', () => {
+    const name = (form.querySelector('#new-ex-name') as HTMLInputElement).value.trim();
+    const muscle = (form.querySelector('#new-ex-muscle') as HTMLSelectElement).value as MuscleGroup;
+    const minReps = parseInt((form.querySelector('#new-ex-min') as HTMLInputElement).value) || 8;
+    const maxReps = parseInt((form.querySelector('#new-ex-max') as HTMLInputElement).value) || 12;
+
+    if (!name) return showInlineWarning(form.querySelector('#new-ex-confirm') as HTMLButtonElement, 'Name required');
+
+    const newExercise = addNewExercise(name, muscle, workoutId, minReps, maxReps);
+    addExerciseToSession(newExercise, workoutId);
+    form.remove();
+  });
 }
 
 function removeSet(btn: HTMLButtonElement) {
@@ -516,17 +687,26 @@ function analysePerformance(exerciseId: number): AnalysisReport | null {
 
 // IMPLEMENTING ANALYSIS
 
-function catchWorkoutAnalysis(workoutId: number): AnalysisReport[] {
-  const workout = workoutDB.find((workout) => workout.workout_id === workoutId);
-  const workoutAnalysis: AnalysisReport[] = [];
-  let tempAnalysis: AnalysisReport | null = null;
+type DashboardEntry = { type: 'report'; data: AnalysisReport; exercise: Exercise } | { type: 'insufficient'; exercise: Exercise };
 
-  workout?.exercises.forEach((exercise) => {
-    tempAnalysis = analysePerformance(exercise.exercise_id);
-    if (tempAnalysis) workoutAnalysis.push(tempAnalysis);
+function catchDashboardAnalysis(filterMuscle?: MuscleGroup, filterWorkoutId?: number): DashboardEntry[] {
+  let exercises = exerciseDB.filter((e) => !e.is_deleted);
+
+  if (filterMuscle) {
+    exercises = exercises.filter((e) => e.muscle === filterMuscle);
+  }
+
+  if (filterWorkoutId) {
+    const workout = workoutDB.find((w) => w.workout_id === filterWorkoutId);
+    const ids = workout?.exercises.map((e) => e.exercise_id) ?? [];
+    exercises = exercises.filter((e) => ids.includes(e.exercise_id));
+  }
+
+  return exercises.map((exercise) => {
+    const analysis = analysePerformance(exercise.exercise_id);
+    if (analysis) return { type: 'report', data: analysis, exercise };
+    return { type: 'insufficient', exercise };
   });
-
-  return workoutAnalysis;
 }
 
 function catchLiveAnalysis(activeInstances: ExerciseInstance[]): AnalysisReport[] {
@@ -604,7 +784,7 @@ function createExerciseRow(exercise: any): HTMLDivElement {
 
   row.innerHTML = `
     <div class="flex flex-row gap-4 ml-2 max-[440px]:gap-2 max-[440px]:ml-1 items-center">
-      <button class="exercise-delete w-fit relative transition-colors duration-200 ease-in-out flex justify-center items-center p-1 max-[440px]:p-0.5 border border-border rounded-full text-border cursor-pointer">
+      <button class="delete-exercise-btn w-fit relative transition-colors duration-200 ease-in-out flex justify-center items-center p-1 max-[440px]:p-0.5 border border-border rounded-full text-border cursor-pointer">
         <svg class="fill-current size-5 max-[550px]:size-4 max-[440px]:size-3" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
         </svg>
@@ -622,7 +802,7 @@ function createExerciseRow(exercise: any): HTMLDivElement {
     <p class="exercise-weight w-full bg-transparent border border-border text-white rounded-lg text-center py-2.5 max-[550px]:py-1.5 max-[550px]:text-xs max-[440px]:py-1 max-[440px]:text-[10px] focus:ring-accent focus:border-accent appearance-none m-0 min-w-0">
       0.0 
     </p>
-    `;
+  `;
 
   const dropdownContainer = document.createElement('div');
   dropdownContainer.className = 'dropdown-content w-full hidden flex flex-col gap-2 bg-surface border-b border-t border-border pt-2';
@@ -657,6 +837,19 @@ function createExerciseRow(exercise: any): HTMLDivElement {
   return row;
 }
 
+function createNewExercise(): string {
+  return `
+    <div class="w-full relative max-[550px]:top-2 mx-auto border-b border-border" style="grid-column: 1 / -1">
+      <button id="add-exercise-btn" class="w-fit relative flex justify-center items-center mx-auto mb-2 px-4 py-2 max-[440px]:px-2.5 max-[440px]:py-1 border border-border rounded-full text-border font-bold max-[550px]:text-sm max-[440px]:text-xs cursor-pointer">
+        Add Exercise
+        <svg class="fill-current size-5 max-[550px]:size-4 ml-0.5" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 4a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 0110 4z" clip-rule="evenodd" />
+        </svg>
+      </button>
+    </div>
+  `;
+}
+
 function createNewSet(i: number) {
   return `
     <div class="set-entry grid gap-3 items-center" style="grid-template-columns: 1fr 12.5% 12.5%" data-set-num="${i}">
@@ -681,6 +874,8 @@ function createNewSet(i: number) {
 // EVENT AND ACTION HANDLERS
 
 function setActionButtons(workoutId: number, container: HTMLDivElement) {
+  container.insertAdjacentHTML('beforeend', createNewExercise());
+
   const saveButtonRow = document.createElement('div');
   saveButtonRow.className = 'mt-5 flex flex-row justify-center gap-3';
   saveButtonRow.innerHTML = `
@@ -691,7 +886,7 @@ function setActionButtons(workoutId: number, container: HTMLDivElement) {
 
   let activeSessionId: string | null = null;
 
-  document.getElementById('save-workout-btn')?.addEventListener('click', async (e) => {
+  document.querySelector('#save-workout-btn')?.addEventListener('click', async (e) => {
     const button = e.target as HTMLButtonElement;
     setButtonLoadingState(button, 'Saving...');
 
@@ -719,7 +914,7 @@ function setActionButtons(workoutId: number, container: HTMLDivElement) {
     setButtonSuccessState(button, 'Saved!', 'Save Workout');
   });
 
-  document.getElementById('export-workout-btn')?.addEventListener('click', async (e) => {
+  document.querySelector('#export-workout-btn')?.addEventListener('click', async (e) => {
     const button = e.target as HTMLButtonElement;
     setButtonLoadingState(button, 'Exporting...');
     await exportWorkoutData();
@@ -747,8 +942,8 @@ function setButtonSuccessState(btn: HTMLButtonElement, successText: string, defa
 // MAIN RENDER CONTROLLER
 
 function renderWorkoutLogForm(workout: Workout) {
-  const workoutLogContainer = document.getElementById('workout-log-container') as HTMLDivElement;
-  const daySelectionContainer = document.getElementById('log-selection-container') as HTMLDivElement;
+  const workoutLogContainer = document.querySelector('#workout-log-container') as HTMLDivElement;
+  const daySelectionContainer = document.querySelector('#log-selection-container') as HTMLDivElement;
   if (!workoutLogContainer || !daySelectionContainer) return;
 
   // UI Setup

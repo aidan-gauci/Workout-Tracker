@@ -76,9 +76,9 @@ window.addEventListener('DOMContentLoaded', () => __awaiter(void 0, void 0, void
     setupGlobalEventListeners();
 }));
 function setupGlobalEventListeners() {
-    const workoutAnalysisContainer = document.getElementById('workout-analysis-container');
-    const gymDaysDropdown = document.getElementById('gym-days');
-    const workoutLogContainer = document.getElementById('workout-log-container');
+    const workoutAnalysisContainer = document.querySelector('#workout-analysis-container');
+    const gymDaysDropdown = document.querySelector('#gym-days');
+    const workoutLogContainer = document.querySelector('#workout-log-container');
     if (workoutAnalysisContainer) {
         workoutAnalysisContainer.addEventListener('click', handleAnalysisClicks);
     }
@@ -122,9 +122,12 @@ function handleWorkoutClicks(event) {
     const dropdownBtn = target.closest('.option-dropdown');
     if (dropdownBtn)
         return toggleSetDropdown(dropdownBtn);
-    const deleteBtn = target.closest('.exercise-delete');
-    if (deleteBtn)
-        return removeExercise(deleteBtn);
+    const delExerciseBtn = target.closest('.delete-exercise-btn');
+    if (delExerciseBtn)
+        return removeExerciseFromSession(delExerciseBtn);
+    const addExerciseBtn = target.closest('#add-exercise-btn');
+    if (addExerciseBtn)
+        return toggleAddExerciseDropdown(addExerciseBtn);
     const delSetBtn = target.closest('.del-set');
     if (delSetBtn)
         return removeSet(delSetBtn);
@@ -150,18 +153,18 @@ function initiatePresetAnalysis(btn) {
     if (workoutDB.length === 0) {
         return showInlineWarning(btn, 'No Workouts Found');
     }
-    const analysisContainer = document.getElementById('workout-analysis-container');
+    const analysisContainer = document.querySelector('#workout-analysis-container');
     if (analysisContainer) {
         analysisContainer.classList = 'flex flex-col items-center w-full';
         analysisContainer.innerHTML = createWorkoutSelectionMenu();
     }
 }
 function initiateLiveAnalysis(btn) {
-    const hasData = activeWorkoutState.some((ex) => ex.sets.some((s) => s.reps > 0));
+    const hasData = activeWorkoutState.length > 0;
     if (!hasData) {
-        return showInlineWarning(btn, 'Log a set first!');
+        return showInlineWarning(btn, 'Select a Workout First!');
     }
-    const analysisContainer = document.getElementById('workout-analysis-container');
+    const analysisContainer = document.querySelector('#workout-analysis-container');
     if (analysisContainer) {
         analysisContainer.classList = 'flex flex-col items-center w-full';
         analysisContainer.innerHTML = createLiveConfirmationMenu();
@@ -177,7 +180,7 @@ function toggleSetDropdown(btn) {
         dropdownContainer.classList.toggle('hidden');
     }
 }
-function removeExercise(btn) {
+function removeExerciseFromSession(btn) {
     const row = btn.closest('.workout-log-entry');
     const exerciseId = parseInt(row.getAttribute('data-exercise-id') || '0', 10);
     if (document.querySelectorAll('.workout-log-entry').length > 1) {
@@ -187,6 +190,147 @@ function removeExercise(btn) {
     else {
         showTooltipWarning(btn, 'Need 1 Exercise!');
     }
+}
+function addNewExercise(name, muscle, workoutId, minReps, maxReps) {
+    const normalisedName = name.trim();
+    const existing = exerciseDB.find((e) => e.name.toLowerCase() === normalisedName.toLowerCase());
+    if (existing)
+        return existing;
+    const newExercise = {
+        exercise_id: globalExerciseIdCounter++,
+        name: normalisedName,
+        muscle,
+    };
+    exerciseDB.push(newExercise);
+    const workout = workoutDB.find((w) => w.workout_id === workoutId);
+    workout === null || workout === void 0 ? void 0 : workout.exercises.push({
+        exercise_id: newExercise.exercise_id,
+        set_num: 3,
+        reps: { min_reps: minReps, max_reps: maxReps },
+    });
+    saveWorkoutData().catch((e) => console.error('Save after new exercise failed', e));
+    return newExercise;
+}
+function addExerciseToSession(exercise, workoutId) {
+    var _a, _b, _c, _d;
+    const workoutExercise = workoutDB.flatMap((w) => w.exercises).find((e) => e.exercise_id === exercise.exercise_id);
+    const setNum = (_a = workoutExercise === null || workoutExercise === void 0 ? void 0 : workoutExercise.set_num) !== null && _a !== void 0 ? _a : 3;
+    const minReps = (_b = workoutExercise === null || workoutExercise === void 0 ? void 0 : workoutExercise.reps.min_reps) !== null && _b !== void 0 ? _b : 8;
+    const maxReps = (_c = workoutExercise === null || workoutExercise === void 0 ? void 0 : workoutExercise.reps.max_reps) !== null && _c !== void 0 ? _c : 12;
+    activeWorkoutState.push({
+        exercise_id: exercise.exercise_id,
+        sets: Array.from({ length: setNum }, (_, i) => ({ num: i + 1, reps: 0, weight: 0 })),
+    });
+    const workoutLogContainer = document.querySelector('#workout-log-container');
+    const rowElement = createExerciseRow(Object.assign(Object.assign({}, exercise), { set_num: setNum, reps: { min_reps: minReps, max_reps: maxReps } }));
+    const addExerciseRow = (_d = workoutLogContainer.querySelector('#add-exercise-btn')) === null || _d === void 0 ? void 0 : _d.closest('div');
+    if (addExerciseRow) {
+        workoutLogContainer.insertBefore(rowElement, addExerciseRow);
+    }
+    else {
+        workoutLogContainer.appendChild(rowElement);
+    }
+}
+function toggleAddExerciseDropdown(btn) {
+    var _a, _b, _c, _d;
+    const existingDropdown = document.querySelector('#add-exercise-dropdown');
+    if (existingDropdown) {
+        existingDropdown.remove();
+        return;
+    }
+    const currentWorkoutId = parseInt(document.querySelector('#gym-days').value.replace('day-', ''));
+    const currentMuscles = (_b = (_a = workoutDB.find((w) => w.workout_id === currentWorkoutId)) === null || _a === void 0 ? void 0 : _a.exercises.map((e) => { var _a; return (_a = exerciseDB.find((ex) => ex.exercise_id === e.exercise_id)) === null || _a === void 0 ? void 0 : _a.muscle; })) !== null && _b !== void 0 ? _b : [];
+    const loggedIds = activeWorkoutState.map((e) => e.exercise_id);
+    const available = exerciseDB
+        .filter((e) => !e.is_deleted && !loggedIds.includes(e.exercise_id))
+        .sort((a, b) => {
+        const aRelevant = currentMuscles.includes(a.muscle) ? 0 : 1;
+        const bRelevant = currentMuscles.includes(b.muscle) ? 0 : 1;
+        return aRelevant - bRelevant;
+    });
+    const dropdown = document.createElement('div');
+    dropdown.id = 'add-exercise-dropdown';
+    dropdown.className = 'flex flex-col w-full bg-surface border border-border mb-2 rounded-lg overflow-hidden';
+    dropdown.innerHTML = `
+    <input 
+      id="exercise-search-input"
+      type="text" 
+      placeholder="Search Exercises..." 
+      class="w-full bg-transparent border-b border-border text-white max-[550px]:text-sm max-[440px]:text-xs px-3 py-2 focus:outline-none focus:border-accent"
+    />
+    <ul id="exercise-option-list" class="flex flex-col max-h-24 max-[550px]:max-h-16 overflow-y-scroll [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-neutral-600">
+      ${available
+        .map((e) => `
+        <li 
+          class="exercise-option px-3 py-2 text-sm max-[550px]:text-xs max-[440px]:text-[10px] text-${'text-' + e.muscle} cursor-pointer hover:bg-border transition-colors duration-150"
+          data-exercise-id="${e.exercise_id}"
+        >
+          ${e.name}
+        </li>
+      `)
+        .join('')}
+      <li id="add-new-exercise-option" class="px-3 py-2 text-sm max-[550px]:text-xs max-[440px]:text-[10px] text-muted cursor-pointer hover:bg-border transition-colors duration-150 border-t border-border">
+        + Add New Exercise
+      </li>
+    </ul>
+  `;
+    btn.insertAdjacentElement('afterend', dropdown);
+    (_c = dropdown.querySelector('#exercise-search-input')) === null || _c === void 0 ? void 0 : _c.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        const options = dropdown.querySelectorAll('.exercise-option');
+        options.forEach((opt) => {
+            var _a;
+            opt.style.display = ((_a = opt.textContent) === null || _a === void 0 ? void 0 : _a.toLowerCase().includes(query)) ? '' : 'none';
+        });
+    });
+    dropdown.querySelectorAll('.exercise-option').forEach((opt) => {
+        opt.addEventListener('click', () => {
+            const id = parseInt(opt.dataset.exerciseId || '0');
+            const exercise = exerciseDB.find((e) => e.exercise_id === id);
+            if (exercise)
+                addExerciseToSession(exercise, currentWorkoutId);
+            dropdown.remove();
+        });
+    });
+    (_d = dropdown.querySelector('#add-new-exercise-option')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
+        dropdown.remove();
+        openNewExerciseForm(btn, currentWorkoutId);
+    });
+}
+function openNewExerciseForm(btn, workoutId) {
+    var _a, _b;
+    const form = document.createElement('div');
+    form.id = 'new-exercise-form';
+    form.className = 'flex flex-col gap-2 w-full bg-surface border border-border rounded-lg p-3 mb-2';
+    form.innerHTML = `
+    <input id="new-ex-name" type="text" placeholder="Exercise name" class="w-full bg-transparent border border-border text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
+    <select id="new-ex-muscle" class="w-full bg-surface border border-border text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-accent">
+      ${['chest', 'biceps', 'back', 'triceps', 'legs', 'abs', 'shoulders', 'forearms']
+        .map((m) => `<option value="${m}">${m.charAt(0).toUpperCase() + m.slice(1)}</option>`)
+        .join('')}
+    </select>
+    <div class="flex gap-2">
+      <input id="new-ex-min" type="number" placeholder="Min reps" min="1" class="w-full bg-transparent border border-border text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
+      <input id="new-ex-max" type="number" placeholder="Max reps" min="1" class="w-full bg-transparent border border-border text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
+    </div>
+    <div class="flex gap-2">
+      <button id="new-ex-cancel" class="w-full border border-border text-border text-sm rounded-lg py-2 cursor-pointer">Cancel</button>
+      <button id="new-ex-confirm" class="w-full border border-accent text-accent text-sm rounded-lg py-2 cursor-pointer">Add</button>
+    </div>
+  `;
+    btn.insertAdjacentElement('afterend', form);
+    (_a = form.querySelector('#new-ex-cancel')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => form.remove());
+    (_b = form.querySelector('#new-ex-confirm')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => {
+        const name = form.querySelector('#new-ex-name').value.trim();
+        const muscle = form.querySelector('#new-ex-muscle').value;
+        const minReps = parseInt(form.querySelector('#new-ex-min').value) || 8;
+        const maxReps = parseInt(form.querySelector('#new-ex-max').value) || 12;
+        if (!name)
+            return showInlineWarning(form.querySelector('#new-ex-confirm'), 'Name required');
+        const newExercise = addNewExercise(name, muscle, workoutId, minReps, maxReps);
+        addExerciseToSession(newExercise, workoutId);
+        form.remove();
+    });
 }
 function removeSet(btn) {
     const dropdownContainer = btn.closest('.dropdown-content');
@@ -389,16 +533,23 @@ function analysePerformance(exerciseId) {
         return null;
     }
 }
-function catchWorkoutAnalysis(workoutId) {
-    const workout = workoutDB.find((workout) => workout.workout_id === workoutId);
-    const workoutAnalysis = [];
-    let tempAnalysis = null;
-    workout === null || workout === void 0 ? void 0 : workout.exercises.forEach((exercise) => {
-        tempAnalysis = analysePerformance(exercise.exercise_id);
-        if (tempAnalysis)
-            workoutAnalysis.push(tempAnalysis);
+function catchDashboardAnalysis(filterMuscle, filterWorkoutId) {
+    var _a;
+    let exercises = exerciseDB.filter((e) => !e.is_deleted);
+    if (filterMuscle) {
+        exercises = exercises.filter((e) => e.muscle === filterMuscle);
+    }
+    if (filterWorkoutId) {
+        const workout = workoutDB.find((w) => w.workout_id === filterWorkoutId);
+        const ids = (_a = workout === null || workout === void 0 ? void 0 : workout.exercises.map((e) => e.exercise_id)) !== null && _a !== void 0 ? _a : [];
+        exercises = exercises.filter((e) => ids.includes(e.exercise_id));
+    }
+    return exercises.map((exercise) => {
+        const analysis = analysePerformance(exercise.exercise_id);
+        if (analysis)
+            return { type: 'report', data: analysis, exercise };
+        return { type: 'insufficient', exercise };
     });
-    return workoutAnalysis;
 }
 function catchLiveAnalysis(activeInstances) {
     const liveAnalysis = [];
@@ -467,7 +618,7 @@ function createExerciseRow(exercise) {
     row.dataset.exerciseId = exercise.exercise_id.toString();
     row.innerHTML = `
     <div class="flex flex-row gap-4 ml-2 max-[440px]:gap-2 max-[440px]:ml-1 items-center">
-      <button class="exercise-delete w-fit relative transition-colors duration-200 ease-in-out flex justify-center items-center p-1 max-[440px]:p-0.5 border border-border rounded-full text-border cursor-pointer">
+      <button class="delete-exercise-btn w-fit relative transition-colors duration-200 ease-in-out flex justify-center items-center p-1 max-[440px]:p-0.5 border border-border rounded-full text-border cursor-pointer">
         <svg class="fill-current size-5 max-[550px]:size-4 max-[440px]:size-3" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
         </svg>
@@ -485,7 +636,7 @@ function createExerciseRow(exercise) {
     <p class="exercise-weight w-full bg-transparent border border-border text-white rounded-lg text-center py-2.5 max-[550px]:py-1.5 max-[550px]:text-xs max-[440px]:py-1 max-[440px]:text-[10px] focus:ring-accent focus:border-accent appearance-none m-0 min-w-0">
       0.0 
     </p>
-    `;
+  `;
     const dropdownContainer = document.createElement('div');
     dropdownContainer.className = 'dropdown-content w-full hidden flex flex-col gap-2 bg-surface border-b border-t border-border pt-2';
     dropdownContainer.style.gridColumn = '1 / -1';
@@ -514,6 +665,18 @@ function createExerciseRow(exercise) {
     row.appendChild(dropdownContainer);
     return row;
 }
+function createNewExercise() {
+    return `
+    <div class="w-full relative max-[550px]:top-2 mx-auto border-b border-border" style="grid-column: 1 / -1">
+      <button id="add-exercise-btn" class="w-fit relative flex justify-center items-center mx-auto mb-2 px-4 py-2 max-[440px]:px-2.5 max-[440px]:py-1 border border-border rounded-full text-border font-bold max-[550px]:text-sm max-[440px]:text-xs cursor-pointer">
+        Add Exercise
+        <svg class="fill-current size-5 max-[550px]:size-4 ml-0.5" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 4a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 0110 4z" clip-rule="evenodd" />
+        </svg>
+      </button>
+    </div>
+  `;
+}
 function createNewSet(i) {
     return `
     <div class="set-entry grid gap-3 items-center" style="grid-template-columns: 1fr 12.5% 12.5%" data-set-num="${i}">
@@ -536,6 +699,7 @@ function createNewSet(i) {
 }
 function setActionButtons(workoutId, container) {
     var _a, _b;
+    container.insertAdjacentHTML('beforeend', createNewExercise());
     const saveButtonRow = document.createElement('div');
     saveButtonRow.className = 'mt-5 flex flex-row justify-center gap-3';
     saveButtonRow.innerHTML = `
@@ -544,7 +708,7 @@ function setActionButtons(workoutId, container) {
   `;
     container.appendChild(saveButtonRow);
     let activeSessionId = null;
-    (_a = document.getElementById('save-workout-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+    (_a = document.querySelector('#save-workout-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
         const button = e.target;
         setButtonLoadingState(button, 'Saving...');
         if (!activeSessionId) {
@@ -567,7 +731,7 @@ function setActionButtons(workoutId, container) {
         yield saveWorkoutData();
         setButtonSuccessState(button, 'Saved!', 'Save Workout');
     }));
-    (_b = document.getElementById('export-workout-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
+    (_b = document.querySelector('#export-workout-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
         const button = e.target;
         setButtonLoadingState(button, 'Exporting...');
         yield exportWorkoutData();
@@ -590,8 +754,8 @@ function setButtonSuccessState(btn, successText, defaultText) {
     }, 2000);
 }
 function renderWorkoutLogForm(workout) {
-    const workoutLogContainer = document.getElementById('workout-log-container');
-    const daySelectionContainer = document.getElementById('log-selection-container');
+    const workoutLogContainer = document.querySelector('#workout-log-container');
+    const daySelectionContainer = document.querySelector('#log-selection-container');
     if (!workoutLogContainer || !daySelectionContainer)
         return;
     daySelectionContainer.classList.add('border-b', 'border-border', 'pb-4', 'mb-4');
