@@ -169,7 +169,7 @@ function handleWorkoutInput(event: Event) {
   const target = event.target as HTMLInputElement;
   if (!target.matches('input.exercise-reps, input.exercise-weight')) return;
 
-  const row = target.closest('.workout-log-entry');
+  const row = target.closest('.workout-log-entry') as HTMLDivElement;
   const setEntry = target.closest('.set-entry');
   if (!row || !setEntry) return;
 
@@ -177,6 +177,7 @@ function handleWorkoutInput(event: Event) {
   const setNum = parseInt(setEntry.getAttribute('data-set-num') || '0', 10);
 
   updateActiveStateData(exerciseId, setNum, target);
+  validateExerciseInputs(row);
 }
 
 function handleWorkoutClicks(event: Event) {
@@ -551,6 +552,22 @@ function addSet(btn: HTMLButtonElement) {
   } else {
     showInlineWarning(btn, 'Max 5 Sets');
   }
+}
+
+function validateExerciseInputs(row: HTMLElement) {
+  const inputs = Array.from(row.querySelectorAll('input.exercise-reps, input.exercise-weight')) as HTMLInputElement[];
+  const isFull = inputs.length > 0 && inputs.every((input) => input.value.trim() !== '' && Number(input.value) > 0);
+  const paragraphs = Array.from(row.querySelectorAll('p.exercise-reps, p.exercise-weight')) as HTMLParagraphElement[];
+
+  console.log(paragraphs);
+
+  paragraphs.forEach((p) => {
+    if (isFull) {
+      p.classList.replace('text-white', 'text-green-500');
+    } else {
+      p.classList.replace('text-green-500', 'text-white');
+    }
+  });
 }
 
 function triggerImport(btn: HTMLButtonElement) {
@@ -1177,7 +1194,14 @@ function setActionButtons(workoutId: number, container: HTMLDivElement) {
   let activeSessionId: string | null = null;
 
   document.querySelector('#save-workout-btn')?.addEventListener('click', async (e) => {
-    const button = e.target as HTMLButtonElement;
+    const button = e.currentTarget as HTMLButtonElement;
+    const allInputs = Array.from(document.querySelectorAll('.workout-log-entry input.exercise-reps, .workout-log-entry input.exercise-weight')) as HTMLInputElement[];
+    const allFull = allInputs.length > 0 && allInputs.every((input) => input.value.trim() !== '' && Number(input.value) > 0);
+
+    if (!allFull) {
+      return showInlineWarning(button, 'Fill all inputs!');
+    }
+
     setButtonLoadingState(button, 'Saving...');
 
     if (!activeSessionId) {
@@ -1205,14 +1229,25 @@ function setActionButtons(workoutId: number, container: HTMLDivElement) {
   });
 
   document.querySelector('#export-workout-btn')?.addEventListener('click', async (e) => {
-    const button = e.target as HTMLButtonElement;
+    const button = e.currentTarget as HTMLButtonElement;
+
+    if (activeWorkoutState.length > 0) {
+      return showInlineWarning(button, 'Clear log first!');
+    }
+
     setButtonLoadingState(button, 'Exporting...');
     await exportWorkoutData();
     setButtonSuccessState(button, 'Exported!', 'Export Data');
   });
 
   document.querySelector('#import-workout-btn')?.addEventListener('click', (e) => {
-    triggerImport(e.target as HTMLButtonElement);
+    const button = e.currentTarget as HTMLButtonElement;
+
+    if (activeWorkoutState.length > 0) {
+      return showInlineWarning(button, 'Clear log first!');
+    }
+
+    triggerImport(button);
   });
 }
 

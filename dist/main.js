@@ -116,6 +116,7 @@ function handleWorkoutInput(event) {
     const exerciseId = parseInt(row.getAttribute('data-exercise-id') || '0', 10);
     const setNum = parseInt(setEntry.getAttribute('data-set-num') || '0', 10);
     updateActiveStateData(exerciseId, setNum, target);
+    validateExerciseInputs(row);
 }
 function handleWorkoutClicks(event) {
     const target = event.target;
@@ -436,6 +437,20 @@ function addSet(btn) {
     else {
         showInlineWarning(btn, 'Max 5 Sets');
     }
+}
+function validateExerciseInputs(row) {
+    const inputs = Array.from(row.querySelectorAll('input.exercise-reps, input.exercise-weight'));
+    const isFull = inputs.length > 0 && inputs.every((input) => input.value.trim() !== '' && Number(input.value) > 0);
+    const paragraphs = Array.from(row.querySelectorAll('p.exercise-reps, p.exercise-weight'));
+    console.log(paragraphs);
+    paragraphs.forEach((p) => {
+        if (isFull) {
+            p.classList.replace('text-white', 'text-green-500');
+        }
+        else {
+            p.classList.replace('text-green-500', 'text-white');
+        }
+    });
 }
 function triggerImport(btn) {
     const input = document.createElement('input');
@@ -965,7 +980,12 @@ function setActionButtons(workoutId, container) {
     }
     let activeSessionId = null;
     (_a = document.querySelector('#save-workout-btn')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
-        const button = e.target;
+        const button = e.currentTarget;
+        const allInputs = Array.from(document.querySelectorAll('.workout-log-entry input.exercise-reps, .workout-log-entry input.exercise-weight'));
+        const allFull = allInputs.length > 0 && allInputs.every((input) => input.value.trim() !== '' && Number(input.value) > 0);
+        if (!allFull) {
+            return showInlineWarning(button, 'Fill all inputs!');
+        }
         setButtonLoadingState(button, 'Saving...');
         if (!activeSessionId) {
             activeSessionId = `${new Date().toISOString().split('T')[0]}-${Date.now()}`;
@@ -988,13 +1008,20 @@ function setActionButtons(workoutId, container) {
         setButtonSuccessState(button, 'Saved!', 'Save Workout');
     }));
     (_b = document.querySelector('#export-workout-btn')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', (e) => __awaiter(this, void 0, void 0, function* () {
-        const button = e.target;
+        const button = e.currentTarget;
+        if (activeWorkoutState.length > 0) {
+            return showInlineWarning(button, 'Clear log first!');
+        }
         setButtonLoadingState(button, 'Exporting...');
         yield exportWorkoutData();
         setButtonSuccessState(button, 'Exported!', 'Export Data');
     }));
     (_c = document.querySelector('#import-workout-btn')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', (e) => {
-        triggerImport(e.target);
+        const button = e.currentTarget;
+        if (activeWorkoutState.length > 0) {
+            return showInlineWarning(button, 'Clear log first!');
+        }
+        triggerImport(button);
     });
 }
 function setButtonLoadingState(btn, text) {
