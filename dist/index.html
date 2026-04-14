@@ -352,16 +352,16 @@
             By Live Workout
           </button>
           <button
-            id="preset-analysis-btn"
+            id="global-analysis-btn"
             class="w-56 max-[600px]:w-32 border border-border rounded-lg text-xl max-[600px]:text-lg max-[440px]:text-base font-bold text-text p-4 cursor-pointer hover:scale-105 transition-all duration-200 ease-in-out"
           >
-            By Preset Workout
+            By Global Workout
           </button>
         </div>
       </section>
 
       <section class="max-w-275 mx-auto bg-surface border border-border px-5 py-6">
-        <div id="log-selection-container" class="flex flex-col justify-center">
+        <div id="log-selection-container" class="flex flex-col justify-center border-b border-border pb-4">
           <p class="text-xl font-bold text-center tracking-widest text-accent uppercase mb-2">Log your Session</p>
           <div class="max-w-xs mx-auto px-4">
             <label for="gym-days" class="block text-sm font-bold text-muted uppercase tracking-wider mb-2">Select Workout Day</label>
@@ -387,7 +387,22 @@
             </div>
           </div>
         </div>
-        <div id="workout-log-container" class="flex flex-col gap-2"></div>
+        <div id="workout-log-container" class="flex flex-col gap-2">
+          <div id="action-button-row" class="mt-4 flex flex-row justify-center gap-3">
+            <button
+              id="export-workout-btn"
+              class="w-46 max-[620px]:w-33 max-[440px]:w-19 bg-surface border border-accent text-accent font-bold max-[620px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 max-[440px]:px-2.5 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer"
+            >
+              Export Data
+            </button>
+            <button
+              id="import-workout-btn"
+              class="w-46 max-[620px]:w-33 max-[440px]:w-19 bg-surface border border-accent text-accent font-bold max-[620px]:text-xs max-[440px]:text-[10px] uppercase tracking-wider px-4 max-[440px]:px-2.5 py-2 rounded-xl hover:scale-105 transition-transform duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer"
+            >
+              Import Data
+            </button>
+          </div>
+        </div>
       </section>
     </main>
   </body>
