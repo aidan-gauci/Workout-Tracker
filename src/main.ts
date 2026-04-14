@@ -1002,7 +1002,7 @@ function createLiveConfirmationMenu(): string {
   return `
     <div id="live-confirmation-container" class="flex flex-col items-center w-full">
       <p class="block text-lg max-[440px]:text-base font-bold text-muted uppercase tracking-wider mb-2">Are you finished logging?</p>
-      <p class="font-extralight text-center max-[440px]:text-sm">Ensure all sets and weights are updated before running your live analysis.</p>
+      <p class="font-extralight text-center max-[440px]:text-sm">Ensure all intended exercises have been added before running your live analysis.</p>
       <div class="flex flex-row gap-3 mt-3">
         <button id="cancel-live-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">Back</button>
         <button id="confirm-live-analysis-btn" class="w-24 max-[440px]:w-20 flex justify-center items-center px-3 py-1 max-[440px]:px-2 border border-border rounded-full text-border font-bold max-[550px]:text-sm whitespace-nowrap transition-colors duration-200 ease-in-out hover:border-white hover:text-white cursor-pointer">Analyse</button>
